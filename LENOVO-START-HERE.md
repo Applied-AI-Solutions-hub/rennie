@@ -37,7 +37,7 @@ The user requires a clean install for each Lenovo iteration. Record the actual b
 7. Confirm the name you entered appears in the sidebar. From a terminal, `openclaw agents list` should show it; note the output.
 8. Close and reopen the app; send another message. Then restart Windows. **Before opening Rennie**, record whether a console window appeared at sign-in, and whether Task Scheduler shows **Rennie model server** as run at sign-in (open Task Scheduler, Task Scheduler Library). Then reopen Rennie and send a message. Record whether the model server and OpenClaw's gateway came back by themselves.
 9. Interrupt a download once (disconnect the network for a minute during the model download) and confirm it resumes by itself; record what the screen said.
-10. Uninstall Rennie; record the result. OpenClaw, the **Rennie model server** task and `%LOCALAPPDATA%\Rennie\engine` stay (removing them on uninstall is not built yet); record what is left.
+10. Uninstall Rennie; record the result. Expected: the **Rennie model server** task is gone from Task Scheduler, no `llama-server.exe` is running, and `%LOCALAPPDATA%\Rennie\engine` (the engine and the model) is deleted. OpenClaw stays; it is a separate program. Record anything left. An upgrade (installing a newer build over this one) must keep the engine and model.
 
 ## Report on the active pull request
 

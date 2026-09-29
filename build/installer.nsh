@@ -13,3 +13,12 @@
 !macro customInit
   !insertmacro AppliedAIMakerSplash
 !macroend
+; On a real uninstall (never on an upgrade, which also runs the old uninstaller),
+; remove the llama.cpp engine: its sign-in task, its running server and its
+; downloaded files. Runs before the app files are deleted, while the script is still there.
+!macro customUnInstall
+  ${ifNot} ${isUpdated}
+    nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\resources\engine-cleanup.ps1"'
+    Pop $0
+  ${endIf}
+!macroend

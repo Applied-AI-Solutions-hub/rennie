@@ -155,6 +155,8 @@ Only the local half of this was tested: the API key, and OpenClaw reaching a lla
    - **Keys:** only starting the server creates the key; checks and chat never write anything.
    - **Checked on the development PC with the real pinned CPU build:** start, the two reply checks ("7 plus 5 equals 12.", "blue"), direct chat, and stop.
    - **Not run for real yet:** the sign-in task and OpenClaw onboarding against the connector. Both change the Windows account, so they are part of the Lenovo acceptance (#5).
+
+   **Step 3 (2026-09-29): uninstall cleanup.** On a real uninstall (never on an upgrade, which also runs the old uninstaller), `build/engine-cleanup.ps1` removes the sign-in task, stops only `llama-server.exe` copies running from Rennie's engine folder, and deletes that folder with `rmdir`, which never follows a folder link elsewhere. OpenClaw stays; it is a separate program. `build/engine-cleanup.test.ps1` runs in CI: a stand-in server inside the folder is stopped, one outside keeps running, a linked folder survives, and the task is removed. The installer's own uninstall and upgrade paths are part of the Lenovo acceptance (#5).
 2. **OpenClaw setup:**
    - Install `@openclaw/llama-cpp-provider`.
    - Onboard with `llama-cpp-existing-server`.
