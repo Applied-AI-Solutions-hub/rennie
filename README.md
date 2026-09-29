@@ -35,9 +35,9 @@ Focus on these paths:
 
 ### In this alpha
 
-- **OpenClaw is the backbone (since the alpha.7 development build).** One setup button installs Ollama and a local model, then installs OpenClaw natively on Windows (no Ubuntu/WSL), configures it for that model, and confirms a first reply through OpenClaw. Chat then goes through OpenClaw. See [what changed and what is still being tested](docs/openclaw-backbone.md).
+- **OpenClaw is the backbone (since the alpha.7 development build).** One setup button downloads a pinned, checksum-verified llama.cpp engine and a model chosen for this PC (Ollama for setups made before 0.7.0-alpha.1), then installs OpenClaw natively on Windows (no Ubuntu/WSL), configures it for that model, and confirms a first reply through OpenClaw. Chat then goes through OpenClaw. See [what changed and what is still being tested](docs/openclaw-backbone.md).
 - One-click installer with no questions; disk space and memory checked before any download; downloads that resume after a stall with no time limit; OpenClaw doctor and repair from the setup page.
-- Native Windows local-model setup with Ollama installation, model downloads, a real selected-model reply check, and persistent Resume setup navigation.
+- Native Windows local-model setup: resumable, verified downloads, a model server that listens on this PC only with a per-install key and starts at sign-in, a real reply check, and persistent Resume setup navigation.
 - Desktop install and workspace basics (tasks, notes, folders, settings)
 - Host readiness / service controls for an existing OpenClaw setup
 - Clean **Rennie** starter manifest (rename allowed; no personal credentials or memory bundled)

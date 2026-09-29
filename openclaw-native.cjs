@@ -93,9 +93,9 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     for(const dir of dirs){const entry=entryFor(dir);if(entry)return located={node,entry,env:{...env,PATH:dirs.join(';'),NO_COLOR:'1'}};}
     return located=null;
   }
-  async function cli(args,options={}){
+  async function cli(args,{extraEnv={},...options}={}){
     if(!located&&!await locate())throw Error('OpenClaw is not installed. Choose Resume setup.');
-    return run(located.node,[located.entry,...args],{env:located.env,...options});
+    return run(located.node,[located.entry,...args],{env:{...located.env,...extraEnv},...options});
   }
 
   function explainInstall(result,log){
@@ -131,11 +131,22 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
   // An existing OpenClaw configuration belongs to the user. Foxsocket reuses
   // it and never re-runs onboarding over it.
   const configured=()=>{try{return fs.statSync(configFile()).size>0;}catch{return false;}};
-  async function onboard({model}){
-    validateModel(model);
+  // target: Rennie's own llama.cpp server ({baseUrl, modelId, apiKey, thinking}). Without one, the local Ollama model.
+  async function onboard({model,target=null}){
+    if(target){
+      if(!/^http:\/\/127\.0\.0\.1:\d{2,5}\/v1$/.test(String(target.baseUrl))||!/^[a-z0-9][a-z0-9.-]{0,63}$/.test(String(target.modelId))||!/^[0-9a-f]{64}$/.test(String(target.apiKey))||(target.thinking&&!['low','medium','high'].includes(target.thinking)))throw Error('The local model server settings are not valid. Choose Resume setup.');
+    }else validateModel(model);
     if(configured())return {reused:true};
-    const args=['onboard','--non-interactive','--accept-risk','--mode','local','--auth-choice','ollama','--custom-base-url',OLLAMA_URL,'--custom-model-id',model,'--install-daemon','--gateway-bind','loopback','--skip-channels','--skip-search','--skip-skills','--skip-ui','--skip-health','--suppress-gateway-token-output','--json'];
-    const r=await cli(args,{timeout:10*60*1000,onLine:line=>{const text=plain(line);if(text)keep(lastLog,text,80);}});
+    const onLine=line=>{const text=plain(line);if(text)keep(lastLog,text,80);};
+    if(target){
+      // OpenClaw's own llama.cpp connector, pinned to the OpenClaw version Rennie installs.
+      const plugin=await cli(['plugins','install','@openclaw/llama-cpp-provider@'+VERSION],{timeout:10*60*1000,onLine});
+      if(plugin.code!==0&&!/already installed/i.test(plugin.stdout+plugin.stderr))throw Error('OpenClaw could not add its llama.cpp connector'+(plugin.timedOut?' within 10 minutes':'')+'. Check the internet connection, see Technical details, then choose Resume setup.');
+    }
+    const provider=target?['--auth-choice','llama-cpp-existing-server','--custom-base-url',target.baseUrl,'--custom-model-id',target.modelId]:['--auth-choice','ollama','--custom-base-url',OLLAMA_URL,'--custom-model-id',model];
+    const args=['onboard','--non-interactive','--accept-risk','--mode','local',...provider,'--install-daemon','--gateway-bind','loopback','--skip-channels','--skip-search','--skip-skills','--skip-ui','--skip-health','--suppress-gateway-token-output','--json'];
+    // The server key reaches OpenClaw through the connector's documented environment variable, never the command line.
+    const r=await cli(args,{timeout:10*60*1000,onLine,...(target?{extraEnv:{LLAMA_SERVER_API_KEY:target.apiKey}}:{})});
     if(r.code!==0){
       const text=r.stdout+'\n'+r.stderr;
       if(/tool|context/i.test(text)&&/ollama|model/i.test(text))throw Error('OpenClaw could not use '+model+' as its model. It needs a model with tool support and at least 16K context. Choose the Recommended model, then Resume setup.');
@@ -146,6 +157,8 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     // difference between a first reply in minutes and a 10-minute timeout. Set only on a
     // configuration Foxsocket just created; best effort, setup still works without it.
     await cli(['config','set','agents.defaults.experimental.localModelLean','true'],{timeout:60000}).catch(()=>null);
+    // Bonsai 2 scored best with medium thinking in our tests; other models keep OpenClaw's default. Best effort.
+    if(target?.thinking)await cli(['config','set','agents.defaults.thinkingDefault',target.thinking],{timeout:60000}).catch(()=>null);
     return {reused:false};
   }
   async function setName(name){

@@ -79,6 +79,22 @@ test('onboarding configures local Ollama with a loopback gateway service and no 
  assert.ok(!args.some(a=>/api-key|token|password/i.test(a)&&!/suppress-gateway-token-output/.test(a)),'no credentials are passed');
  await assert.rejects(f.claw.onboard({model:'bad model; rm'}),/valid local model/);
 });
+test('onboarding to Rennie’s llama.cpp server adds the pinned connector and passes the key only through the environment',async()=>{
+ const l=layout();const f=fake(l);const key='ab'.repeat(32);
+ const target={baseUrl:'http://127.0.0.1:18080/v1',modelId:'bonsai-2-27b',apiKey:key,thinking:'medium'};
+ assert.deepEqual(await f.claw.onboard({model:'bonsai-2-27b',target}),{reused:false});
+ const cli=f.cliCalls().map(c=>c.args.slice(1));
+ assert.deepEqual(cli[0],['plugins','install','@openclaw/llama-cpp-provider@'+VERSION],'the connector is added first, pinned to the OpenClaw version');
+ const onboard=f.cliCalls().find(c=>c.args[1]==='onboard');const args=onboard.args;
+ assert.equal(args[args.indexOf('--auth-choice')+1],'llama-cpp-existing-server');assert.equal(args[args.indexOf('--custom-base-url')+1],'http://127.0.0.1:18080/v1');
+ assert.equal(args[args.indexOf('--custom-model-id')+1],'bonsai-2-27b');assert.equal(args[args.indexOf('--gateway-bind')+1],'loopback');
+ assert.ok(!f.calls.some(c=>c.args.join(' ').includes(key)),'the key never appears in any command line');
+ assert.equal(onboard.options.env.LLAMA_SERVER_API_KEY,key);assert.ok(!f.cliCalls().filter(c=>c!==onboard).some(c=>c.options.env?.LLAMA_SERVER_API_KEY),'only onboarding receives the key');
+ assert.ok(cli.some(a=>a.join(' ')==='config set agents.defaults.experimental.localModelLean true'));assert.ok(cli.some(a=>a.join(' ')==='config set agents.defaults.thinkingDefault medium'));
+ for(const bad of [{...target,baseUrl:'http://192.0.2.1:18080/v1'},{...target,apiKey:'short'},{...target,modelId:'a b'},{...target,thinking:'max'}])await assert.rejects(fake(layout()).claw.onboard({model:'x',target:bad}),/not valid/);
+ const failed=fake(layout(),{'plugins install':{code:1,stdout:'',stderr:'npm error network'}});
+ await assert.rejects(failed.claw.onboard({model:'x',target}),/could not add its llama\.cpp connector/);assert.ok(!failed.cliCalls().some(c=>c.args[1]==='onboard'));
+});
 test('an existing OpenClaw configuration is reused and never re-onboarded',async()=>{
  const l=layout({configured:true});const f=fake(l);
  assert.deepEqual(await f.claw.onboard({model:'llama3.2:3b'}),{reused:true});assert.equal(f.cliCalls().length,0);

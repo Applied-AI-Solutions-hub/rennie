@@ -4,18 +4,27 @@
  const gb=n=>Number.isFinite(n)?(Math.round(n/1024**3*10)/10).toString():'?';
  // Plain-language steps. Each maps to the setup phases it covers, so a failure
  // can point at the exact step that stopped instead of a generic error.
- const STAGES=[
-  ['Check this PC',['checking']],
-  ['Install Ollama, which runs the AI model',['downloading-runtime','checking-installer','installing-runtime','starting']],
-  ['Download the AI model',['downloading-model']],
-  ['Check that the model answers',['verifying']],
+ const OPENCLAW_STAGES=[
   ['Install and set up OpenClaw, your assistant',['installing-openclaw','configuring-openclaw','starting-openclaw']],
   ['Get a first reply through OpenClaw',['verifying-openclaw']],
  ];
+ const ENGINE_STAGES={
+  ollama:[
+   ['Install Ollama, which runs the AI model',['downloading-runtime','checking-installer','installing-runtime','starting']],
+   ['Download the AI model',['downloading-model']],
+   ['Check that the model answers',['verifying']]],
+  // The llama.cpp server starts only once the model is on disk, so starting belongs with the reply check.
+  llama:[
+   ['Download the llama.cpp engine, which runs the AI model',['downloading-engine','unpacking-engine']],
+   ['Download the AI model',['downloading-model']],
+   ['Start the model and check that it answers',['starting','verifying']]],
+ };
+ const stagesFor=engine=>[['Check this PC',['checking']],...(ENGINE_STAGES[engine]||ENGINE_STAGES.ollama),...OPENCLAW_STAGES];
  // The last two steps are OpenClaw's; a failure there offers OpenClaw doctor.
- const OPENCLAW_PHASES=STAGES.slice(-2).flatMap(([,phases])=>phases);
+ const OPENCLAW_PHASES=OPENCLAW_STAGES.flatMap(([,phases])=>phases);
  const doctorButton=busy=>`<button data-action="openclaw-doctor" ${busy?'disabled':''}>${busy?'Running OpenClaw doctor…':'Run OpenClaw doctor'}</button>`;
  function stages(local){
+  const STAGES=stagesFor(local.engine);
   const at=phase=>STAGES.findIndex(([,phases])=>phases.includes(phase));
   const current=local.phase==='attention'?at(local.failedPhase):at(local.phase);
   return `<ol class="setup-stages">${STAGES.map(([label],i)=>{
@@ -37,15 +46,16 @@
   const pct=total?Math.min(100,Math.floor(100*completed/total)):null;
   const busy=!!local.busy,ready=local.verified===true&&local.phase==='ready'&&local.model===choice;
   const known=models.some(m=>m.id===choice);
-  const recommended=pc?.recommended&&pc.recommended!==models[0]?.id?models.find(m=>m.id===pc.recommended):null;
+  const llama=local.engine==='llama';
+  const recommended=pc?.recommended&&(llama||pc.recommended!==models[0]?.id)?models.find(m=>m.id===pc.recommended):null;
   const openclawTrouble=local.phase==='attention'&&OPENCLAW_PHASES.includes(local.failedPhase);
-  return `<div class="page-intro"><h1>${ready?'Your assistant is ready':'Set up your assistant on this PC'}</h1><p>Rennie installs and connects everything for you: <strong>Ollama</strong> runs the AI model on this PC, and <strong>OpenClaw</strong> is the assistant that uses it. No API key is required, and there are no accounts to create or commands to type.</p></div>
+  return `<div class="page-intro"><h1>${ready?'Your assistant is ready':'Set up your assistant on this PC'}</h1><p>Rennie installs and connects everything for you: <strong>${llama?'llama.cpp':'Ollama'}</strong> runs the AI model on this PC, and <strong>OpenClaw</strong> is the assistant that uses it. No API key is required, and there are no accounts to create or commands to type.</p></div>
    <section class="panel"><h2>1. This PC</h2>${pc?`<p>${gb(pc.totalMemory)} GB of memory · ${gb(pc.freeBytes)} GB of free space. ${pc.modelKnown===false?`Setup will download the model${pc.download?` and about ${gb(pc.download)} GB more`:''}, so a steady internet connection helps.`:pc.download?`Setup will download about ${gb(pc.download)} GB, so a steady internet connection helps.`:'Everything setup needs is already on this PC.'}</p>${pc.enoughSpace?'':`<div class="notice" role="alert">${esc(pc.problem)}</div>`}${pc.caution?`<div class="notice">${esc(pc.caution)}</div>`:''}`:'<p>Checking this PC…</p>'}</section>
    <section class="panel"><h2>2. Name your assistant <small>(optional)</small></h2><label class="field">Assistant name<input id="local-agent-name" value="${esc(local.agentName||'')}" maxlength="40" placeholder="My assistant" ${busy?'disabled':''}></label><p>The name is saved in OpenClaw. If OpenClaw was already set up on this PC, its existing name and settings are kept.</p></section>
-   <section class="panel"><h2>3. Choose the AI model</h2>${recommended?`<p><strong>For this PC’s memory we recommend ${esc(recommended.label)}.</strong></p>`:''}
+   <section class="panel"><h2>3. Choose the AI model</h2>${recommended?`<p><strong>For this PC${llama?'':'’s memory'} we recommend ${esc(recommended.label)}.</strong>${llama&&pc.recommendedReason?' '+esc(pc.recommendedReason)+'.':''}</p>`:''}${llama&&pc?.lowMemory?'<div class="notice">This PC has less than 8 GB of memory. The model will run, but slowly, and other apps may slow down while it answers.</div>':''}
    <label class="field">Model<select id="local-model" ${busy?'disabled':''}>${models.map(m=>`<option value="${esc(m.id)}" ${m.id===choice?'selected':''}>${esc(m.label)} — ${esc(m.download)}</option>`).join('')}${!known?`<option selected value="${esc(choice)}">${esc(choice)} (custom)</option>`:''}</select></label><p>${esc(models.find(m=>m.id===choice)?.memory||'Quality depends on the selected model.')}</p>
-   <details><summary>Use another on-device Ollama model</summary><label class="field">Model name<input id="local-custom-model" value="${esc(choice)}" maxlength="200" ${busy?'disabled':''}></label><p>OpenClaw needs a model with tool support and at least 16K context. Large models may exceed this PC’s memory.</p></details>
-   <p>Models: <a href="#" data-local-license="true">Llama 3.2 license and model information</a>. Downloads need internet; replies on this PC do not.</p>
+   ${llama?'':`<details><summary>Use another on-device Ollama model</summary><label class="field">Model name<input id="local-custom-model" value="${esc(choice)}" maxlength="200" ${busy?'disabled':''}></label><p>OpenClaw needs a model with tool support and at least 16K context. Large models may exceed this PC’s memory.</p></details>`}
+   <p>Models: <a href="#" data-local-license="true">${llama?'License and model information':'Llama 3.2 license and model information'}</a>. Downloads need internet; replies on this PC do not.</p>
    <button class="primary" data-action="prepare-local" ${busy||(pc&&!pc.enoughSpace)?'disabled':''}>${busy?'Setting up…':ready?'Check again':local.phase==='idle'?'Set up my assistant':'Resume setup'}</button></section>
    <section class="panel" id="local-setup-progress" tabindex="-1" aria-labelledby="local-progress-title"><h2 id="local-progress-title">4. Progress</h2><strong role="status">${esc(local.message||'Ready to start.')}</strong>${stages(local)}
    ${busy&&['downloading-runtime','installing-runtime'].includes(local.phase)?'<p>Ollama may open its own welcome window. No sign-in is needed there; come back to Rennie.</p>':''}
