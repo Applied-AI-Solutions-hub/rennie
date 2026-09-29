@@ -72,6 +72,7 @@
     ],
     "win": {
       "target": "nsis",
+      "artifactName": "Rennie-Setup-${version}.${ext}",
       "forceCodeSigning": true,
       "signExts": [
         ".exe",

@@ -26,6 +26,10 @@ test('checks coalesce, authenticate only the fixed API, and do not expose tokens
  const checker=createChecker({current:'1.0.0',readToken:()=> 'private-token',onChange:s=>snapshots.push(s),fetchImpl:async(url,options)=>{calls++;assert.ok(url.startsWith(`https://api.github.com/repos/${repository}/releases?`));assert.equal(options.headers.Authorization,'Bearer private-token');assert.equal(options.redirect,'error');return response(200,[]);}});
  await Promise.all([checker.check(),checker.check()]);assert.equal(calls,1);assert.equal(checker.get().status,'no-releases');assert.ok(!JSON.stringify(snapshots).includes('private-token'));
 });
+test('installer artifact name has no spaces, so GitHub serves it unrenamed and SHA256SUMS entries match',()=>{
+ const {artifactName}=require('./package.json').build.win;
+ assert.match(artifactName,/^\S+\$\{version\}\.\$\{ext\}$/);
+});
 test('timeout and malformed data are recoverable',async()=>{
  const checker=createChecker({current:'1.0.0',timeoutMs:10,fetchImpl:(_,options)=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Error('timeout'))))});
  assert.equal((await checker.check()).status,'unavailable');assert.equal((await createChecker({current:'1.0.0',fetchImpl:async()=>response(200,{})}).check()).status,'unavailable');
