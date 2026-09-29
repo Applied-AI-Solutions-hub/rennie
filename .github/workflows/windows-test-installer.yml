@@ -36,6 +36,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell -NoProfile -ExecutionPolicy Bypass -File build/host-progress.test.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell -NoProfile -ExecutionPolicy Bypass -File build/engine-cleanup.test.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Check normal chat request path
         run: pnpm exec electron local-chat-smoke.cjs
       - name: Check chat recovers from a failed save
