@@ -34,3 +34,11 @@ test('the recommended model follows this PC’s memory',()=>{
  assert.equal(recommendModel(4*GB,MODELS),'llama3.2:1b');
  assert.equal(recommendModel(undefined,MODELS),'llama3.2:3b');
 });
+test('the llama.cpp engine is sized from its own archive and unpacked build, not Ollama’s',()=>{
+ const needs={needsRuntime:true,runtimeDownloadBytes:0.65*GB,runtimeSpaceBytes:1.2*GB,needsModel:true,modelBytes:7.2*GB,needsOpenClaw:true};
+ const {download,space}=plan(needs);
+ assert.ok(Math.abs(download-(0.65+7.2+0.2)*GB)<1e6,'archive, model and OpenClaw');
+ assert.ok(Math.abs(space-((0.65+1.2)+1.5+7.2*1.1+2)*GB)<1e6,'archive and unpacked build together, OpenClaw, model and margin');
+ assert.deepEqual(plan({needsRuntime:false,needsModel:false,needsOpenClaw:false}),{download:0,space:0},'nothing to do means nothing to check');
+ assert.equal(assess({freeBytes:8*GB,...needs}).enoughSpace,false);
+});

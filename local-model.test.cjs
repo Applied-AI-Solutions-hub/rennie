@@ -171,3 +171,55 @@ test('an unexpected answer through OpenClaw is reported, but a working install i
  const f=agentFixture({reply:'I cannot do math.'});const result=await f.make().prepare(DEFAULT_MODEL);
  assert.equal(result.phase,'ready');assert.match(result.message,/answer to a basic check was off/);
 });
+
+// Rennie's llama.cpp engine in place of Ollama (llama-runtime.cjs provides the real one).
+function llamaFixture({built=false,downloaded=false,running=false,scheduleFails=false,verifyFails=null,configured=false}={}){
+ const calls=[],state={built,downloaded,running,scheduled:false};
+ const engine={kind:'llama',models:[{id:'qwen3.5-4b',label:'Qwen3.5 4B'},{id:'bonsai-2-27b',label:'Ternary Bonsai 2 27B'}],
+  needs:()=>({needsBuild:!state.built,needsModel:!state.downloaded,buildBytes:20,unpackedBytes:50,modelBytes:2000}),
+  install:async(model,progress)=>{calls.push('install:'+model);progress({phase:'downloading-engine',completed:5,total:20});progress({phase:'downloading-model',completed:10,total:2000});state.built=state.downloaded=true;},
+  start:async model=>{calls.push('start:'+model);state.running=true;},running:async()=>state.running,
+  schedule:async model=>{calls.push('schedule:'+model);if(scheduleFails)throw Error('Rennie could not set the local model to start when you sign in. It still starts whenever Rennie opens.');state.scheduled=true;},
+  verify:async model=>{calls.push('verify:'+model);if(verifyFails)throw Error(verifyFails);return {ok:true,reply:'arithmetic: 12 · instruction: blue'};},
+  target:model=>({baseUrl:'http://127.0.0.1:18080/v1',modelId:model,apiKey:'ab'.repeat(32),thinking:model==='bonsai-2-27b'?'medium':null})};
+ const targets=[];const f=agentFixture({replyModel:'llama-cpp/qwen3.5-4b',installed:configured,configured});
+ f.openclaw.onboard=async({model,target})=>{targets.push(target);f.calls.push('onboard:'+model);return {reused:false};};
+ const api=new Proxy({},{get:(_,name)=>()=>{throw Error('Ollama must not be used: '+String(name));}});
+ const make=(saved=null)=>createLocalSetup({api,platform:api,engine,defaultModel:'qwen3.5-4b',openclaw:f.openclaw,read:()=>saved,onReady:s=>f.ready.push(s)});
+ return {calls,agentCalls:f.calls,targets,state,make,engine};
+}
+test('with the llama.cpp engine, setup downloads, starts, schedules and verifies it, then points OpenClaw at it, never touching Ollama',async()=>{
+ const f=llamaFixture();const manager=f.make();const phases=[];
+ const job=manager.prepare('qwen3.5-4b',{agentName:'Pip'});const result=await job;
+ assert.equal(manager.get().model,'qwen3.5-4b','the engine’s default model is used');
+ assert.deepEqual(f.calls,['install:qwen3.5-4b','start:qwen3.5-4b','schedule:qwen3.5-4b','verify:qwen3.5-4b']);
+ assert.deepEqual(f.targets,[{baseUrl:'http://127.0.0.1:18080/v1',modelId:'qwen3.5-4b',apiKey:'ab'.repeat(32),thinking:null}]);
+ assert.equal(result.phase,'ready');assert.equal(result.engine,'llama');assert.equal(result.backbone,'openclaw');assert.equal(result.agentModel,'qwen3.5-4b','the provider prefix is removed');
+ assert.equal(f.state.scheduled,true);
+});
+test('a model outside the engine’s list is refused before anything runs',async()=>{
+ const f=llamaFixture();assert.throws(()=>f.make().prepare('llama3.2:3b'),/one of the listed local models/);assert.deepEqual(f.calls,[]);
+});
+test('if the sign-in task cannot be created, setup still finishes and says so',async()=>{
+ const f=llamaFixture({scheduleFails:true});const result=await f.make().prepare('qwen3.5-4b');
+ assert.equal(result.phase,'ready');assert.match(result.note,/still starts whenever Rennie opens/);
+});
+test('reopening Rennie restarts the engine without downloading, scheduling or messaging the agent',async()=>{
+ const f=llamaFixture({built:true,downloaded:true,running:false,configured:true});
+ const manager=f.make({phase:'ready',model:'qwen3.5-4b',engine:'llama',backbone:'openclaw'});
+ const status=await manager.status('qwen3.5-4b',{agent:true});
+ assert.deepEqual(f.calls,['start:qwen3.5-4b','verify:qwen3.5-4b']);assert.ok(!f.agentCalls.some(c=>c.startsWith('chat:')));
+ assert.equal(status.ok,true);assert.equal(status.providerId,'openclaw');
+});
+test('engine status reports a stopped server or a missing model instead of ready',async()=>{
+ const stopped=llamaFixture({built:true,downloaded:true});await stopped.make().prepare('qwen3.5-4b');stopped.state.running=false;
+ const manager=stopped.make();
+ assert.match((await manager.status('qwen3.5-4b')).error,/verify a real reply|not running/i);
+ const missing=llamaFixture({built:true,downloaded:false});
+ assert.match((await missing.make().status('qwen3.5-4b')).error,/not downloaded/);
+});
+test('a failed reply check stops setup at that step with the engine’s own explanation',async()=>{
+ const f=llamaFixture({verifyFails:'The local model is installed and running, but it answered the basic arithmetic check incorrectly.'});
+ const result=await f.make().prepare('qwen3.5-4b');
+ assert.equal(result.phase,'attention');assert.equal(result.failedPhase,'verifying');assert.match(result.error,/arithmetic check incorrectly/);
+});

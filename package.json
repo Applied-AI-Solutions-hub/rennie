@@ -67,7 +67,8 @@
       "local-chat.cjs",
       "download.cjs",
       "preflight.cjs",
-      "openclaw-native.cjs"
+      "openclaw-native.cjs",
+      "llama-runtime.cjs"
     ],
     "win": {
       "target": "nsis",

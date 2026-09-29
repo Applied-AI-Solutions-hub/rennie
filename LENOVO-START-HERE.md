@@ -6,6 +6,7 @@
 - **Chat after a failed save** (for example, a full disk): the message is not sent, the conversation says so, and you can send again. Chat no longer stays locked.
 - **Optional WSL Host path:** a Linux environment that is slow to start is reported as "took too long to respond", not as OpenClaw missing.
 - **Smaller installer:** retired files and bundle-only libraries are no longer packaged. Report anything that looks unstyled or missing.
+- **New model engine (llama.cpp) for new setups:** Rennie downloads a pinned, checksum-verified llama.cpp build and a model chosen for this PC, instead of installing Ollama. On a PC without an NVIDIA GPU, which includes this Lenovo, that is Qwen3.5 4B running on the processor (about 2.7 GB). The engine and model are kept in `%LOCALAPPDATA%\Rennie\engine`. The model server listens on this PC only, needs a per-install key, and starts at sign-in through a Task Scheduler task named **Rennie model server**. OpenClaw connects to it with its llama.cpp connector. A setup that already works on Ollama keeps using Ollama for now.
 
 **The owner has chosen to use Lenovo as a development PC.** Continue development with the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** CI artifact or `pnpm dev:fresh`. See [development setup](docs/development.md) (DEVELOPMENT.md in the artifact) for the explicit owner-controlled Windows setting and commands. No signing account is needed for development.
 
@@ -30,13 +31,13 @@ The user requires a clean install for each Lenovo iteration. Record the actual b
 1. Verify SHA256SUMS.txt (it names the exact installer file) and BUILD-INFO.json. Launch the installer from Explorer. Expected: no questions, no administrator prompt, the app opens. Record the install path and any Windows security message.
 2. On the setup page, record what "This PC" reports (memory, free space, planned download) and the recommended model.
 3. Enter an assistant name, then choose **Set up my assistant**. Record the exact model.
-4. Watch the six steps. Record: the Ollama welcome window; progress during downloads; any **Windows permission prompt for Node.js** (approve it and record the wording); how long the OpenClaw step takes; whether anything else opens.
+4. Watch the six steps. Record: which steps name llama.cpp or Ollama; progress during downloads; whether any console window appears; any **Windows permission prompt for Node.js** (approve it and record the wording); how long the OpenClaw step takes; whether anything else opens.
 5. **New and highest-risk step:** the OpenClaw install and setup. If it stops, record the message, expand **Technical details** and copy the installer output into the report (redact paths and names), then choose **Run OpenClaw doctor** and record the findings. Note whether Smart App Control is on; it may block or restrict OpenClaw's PowerShell installer.
 6. On success, record the first reply shown, then **Start a conversation**. Ask: `This is an installation test. What is 7 plus 5? Answer in one short sentence.`, then in the same chat `Reply with only the word blue.`, then an ordinary question of your own. Record the replies.
 7. Confirm the name you entered appears in the sidebar. From a terminal, `openclaw agents list` should show it; note the output.
-8. Close and reopen the app; send another message. Then restart Windows, reopen Rennie, and send a message. Record whether OpenClaw's gateway came back by itself.
+8. Close and reopen the app; send another message. Then restart Windows. **Before opening Rennie**, record whether a console window appeared at sign-in, and whether Task Scheduler shows **Rennie model server** as run at sign-in (open Task Scheduler, Task Scheduler Library). Then reopen Rennie and send a message. Record whether the model server and OpenClaw's gateway came back by themselves.
 9. Interrupt a download once (disconnect the network for a minute during the model download) and confirm it resumes by itself; record what the screen said.
-10. Uninstall Rennie; record the result. OpenClaw and Ollama stay installed (they are separate programs); record that too.
+10. Uninstall Rennie; record the result. OpenClaw, the **Rennie model server** task and `%LOCALAPPDATA%\Rennie\engine` stay (removing them on uninstall is not built yet); record what is left.
 
 ## Report on the active pull request
 
@@ -45,6 +46,7 @@ Post the report as a comment on the active pull request in this repository. Incl
 ## Known open work
 
 - Signing (SignPath Foundation application not yet submitted). Without it, protected consumer PCs cannot run the installer.
-- Answer quality of the 3B model under OpenClaw's own agent prompt is untested.
+- Answer quality of Qwen3.5 4B on the processor under OpenClaw's agent prompt is measured only on the development PC (first reply about 2 minutes, then about 10 s); untested on the Lenovo.
+- The sign-in task has not yet been run on a real sign-in. That is steps 8 and 10 above.
 - Ollama is started both by its own startup entry and by Rennie; its welcome window still opens (see finding 6 in the record).
 - Cancel controls for a running download, and the skills library (to be built on OpenClaw skills).

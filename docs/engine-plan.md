@@ -145,7 +145,16 @@ Only the local half of this was tested: the API key, and OpenClaw reaching a lla
    - **Pinned downloads:** Hugging Face files are pinned to a repository revision, not `main`.
    - **Key file:** the key is passed with `--api-key-file`, so it never appears in a process list. The web UI is off (`--no-webui`).
    - **Model alias:** the model is served under a fixed alias. Rennie treats a server as its own only when it accepts this install's key and serves that alias, so another program on port 18080 is never mistaken for it.
-   - **Still to do:** nothing calls this module yet, so setup still uses Ollama. Next come starting the server from setup and at sign-in (a Scheduled Task), the install location, and the warm-up request. The warm-up is covered in practice by OpenClaw's first reply check.
+   - **Left for step 2:** starting the server from setup and at sign-in (a Scheduled Task), and the install location. The warm-up request is covered in practice by OpenClaw's first reply check.
+
+   **Step 2 (2026-09-29): wired in.** New setups use llama.cpp; a setup already working on Ollama keeps it until step 4.
+   - **Install location:** `%LOCALAPPDATA%\Rennie\engine`.
+   - **Sign-in task:** a per-user Task Scheduler task, **Rennie model server**, runs `conhost.exe --headless llama-server …` at sign-in, so no window appears. It doesn't restart automatically: a server Rennie stops on purpose stays stopped, and Rennie starts it again whenever it opens.
+   - **Stopping:** `stop()` ends only `llama-server.exe` copies running from that folder.
+   - **OpenClaw:** OpenClaw gets the pinned `@openclaw/llama-cpp-provider`, is onboarded with `llama-cpp-existing-server`, and receives the key only through `LLAMA_SERVER_API_KEY`. Lean mode is on, and `thinkingDefault` is `medium` for Bonsai 2.
+   - **Keys:** only starting the server creates the key; checks and chat never write anything.
+   - **Checked on the development PC with the real pinned CPU build:** start, the two reply checks ("7 plus 5 equals 12.", "blue"), direct chat, and stop.
+   - **Not run for real yet:** the sign-in task and OpenClaw onboarding against the connector. Both change the Windows account, so they are part of the Lenovo acceptance (#5).
 2. **OpenClaw setup:**
    - Install `@openclaw/llama-cpp-provider`.
    - Onboard with `llama-cpp-existing-server`.

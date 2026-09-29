@@ -80,9 +80,10 @@ function createLocalApi({fetchImpl=fetch,stallMs=180000,attempts=4,pause=sleep}=
   }
   return {installed,verify,pull,reachable:async()=>{try{await (await request('/api/tags')).json();return true;}catch{return false;}}};
 }
-function createLocalSetup({read=()=>null,write=()=>{},api,platform,openclaw=null,checkSpace=null,onReady=()=>{},onChange=()=>{},now=Date.now}) {
+// engine: Rennie's llama.cpp runtime (llama-runtime.cjs). Without it, setup uses Ollama (api, platform) as before.
+function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,defaultModel=DEFAULT_MODEL,openclaw=null,checkSpace=null,onReady=()=>{},onChange=()=>{},now=Date.now}) {
   const saved=read();
-  let state={phase:'idle',model:DEFAULT_MODEL,message:'Choose a model to run on this PC.',...saved,busy:false,verified:false};
+  let state={phase:'idle',model:defaultModel,message:'Choose a model to run on this PC.',...saved,busy:false,verified:false};
   if(saved?.busy)state={...state,phase:'interrupted',message:'Setup was interrupted. Resume to continue.',error:saved.error||null};
   if(saved?.phase==='ready')state.message='Last setup succeeded. Checking a fresh reply after reopening.';
   let job=null,verifiedModel=null,rechecked=false;
@@ -102,6 +103,10 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,openclaw=null
   // What setup still has to download or install. One model-list read answers both
   // "is Ollama running" and "is the model there"; OpenClaw is looked up in parallel.
   async function needs(model){
+    if(engine){
+      const need=engine.needs(model),claw=openclaw?await openclaw.locate():true;
+      return {needsRuntime:need.needsBuild,runtimeDownloadBytes:need.buildBytes,runtimeSpaceBytes:need.unpackedBytes,needsModel:need.needsModel,modelBytes:need.modelBytes,needsOpenClaw:!claw};
+    }
     const [present,claw]=await Promise.all([api.installed(model).catch(()=>null),openclaw?openclaw.locate():true]);
     return {needsOllama:present===null&&!await platform.find(),needsModel:present!==true,modelBytes:MODELS.find(m=>m.id===model)?.bytes??null,needsOpenClaw:!claw};
   }
@@ -120,7 +125,7 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,openclaw=null
     }
     set({phase:'configuring-openclaw',message:'Setting up your OpenClaw agent to use '+model+' on this PC.'});
     let reused=openclaw.configured();
-    if(install)({reused}=await openclaw.onboard({model}));
+    if(install)({reused}=await openclaw.onboard({model,target:engine?engine.target(model):null}));
     else if(!reused)throw Error('OpenClaw is not set up yet. Choose Resume setup.');
     let nameNote=null;
     if(install&&agentName&&!reused){try{await openclaw.setName(agentName);}catch(error){nameNote=error.message;}}
@@ -135,31 +140,43 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,openclaw=null
     const check=require('./local-chat.cjs').CHECKS[0];
     const reply=await openclaw.chat({message:check.prompt,session:`agent:${agent.id}:${SETUP_SESSION}`});
     // The model OpenClaw actually answered with. An existing OpenClaw setup keeps its own model.
-    const agentModel=String(reply.model||'').replace(/^ollama\//,'')||null;
+    const agentModel=String(reply.model||'').replace(/^(?:ollama|llama-cpp)\//,'')||null;
     return {agent,reused,nameNote,agentModel,agentReply:reply.content.slice(0,300),agentCheck:check.accept(reply.content)};
   }
   // agent: chat is routed through OpenClaw. The direct local route checks only Ollama.
   function prepare(model=state.model,{install=true,agentName=state.agentName||null,agent:viaAgent=true,probe=install}={}) {
     validateModel(model);
+    if(engine&&!engine.models.some(m=>m.id===model))throw Error('Choose one of the listed local models.');
     if(job)return job;
     job=Promise.resolve().then(async()=>{
       verifiedModel=null;set({busy:true,phase:'checking',model,agentName,verified:false,error:null,reply:null,total:null,completed:0,message:'Checking this PC.'});
       try {
         if(install)await checkBeforeDownloading(model);
-        if(!await api.reachable()) {
+        let startNote=null;
+        if(engine){
+          const need=engine.needs(model);
+          if(need.needsBuild||need.needsModel){
+            if(!install)throw Error('The local model is not set up yet. Choose Resume setup.');
+            await engine.install(model,update=>set({phase:update.phase||'downloading-model',...update},true));
+          }
+          set({phase:'starting',total:null,completed:0,message:'Starting the local model server on this PC.'});
+          await engine.start(model);
+          // Setup also makes the server start when you sign in to Windows. Without that it still starts whenever Rennie opens.
+          if(install){try{await engine.schedule(model);}catch(error){startNote=error.message;}}
+        }else if(!await api.reachable()) {
           if(!await platform.find()){
             if(!install)throw Error('Ollama is not installed. Choose Set up local model.');
             await platform.install(update=>set({phase:update.phase||'downloading-runtime',...update},true));
           }
           set({phase:'starting',total:null,completed:0,message:'Starting Ollama on this PC.'});await platform.start();
         }
-        if(!await api.installed(model)){
+        if(!engine&&!await api.installed(model)){
           if(!install)throw Error('The selected model is not downloaded. Resume local setup to download it.');
           set({phase:'downloading-model',message:'Requesting the model download.',total:null,completed:0});
           await api.pull(model,update=>set({phase:'downloading-model',...update},true));
         }
         set({phase:'verifying',message:'Asking the selected model for a real reply. The first load can take a few minutes.',total:null,completed:0});
-        const result=await api.verify(model);
+        const result=engine?await engine.verify(model):await api.verify(model);
         let agent=null;
         if(openclaw&&viaAgent)agent=await prepareAgent(model,{install,probe,agentName});
         verifiedModel=model;
@@ -168,7 +185,7 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,openclaw=null
         const kept=agent?.reused?(used&&normalized(used)!==normalized(model)?` Your existing OpenClaw setup was kept, so it uses ${used} rather than ${model}. Change the model in OpenClaw to switch.`:' Your existing OpenClaw settings were kept.'):'';
         const quality=agent&&agent.agentCheck===false?' Your assistant replied, but its answer to a basic check was off; small local models can give unreliable answers.':'';
         const message=agent?`Ready. Your assistant runs on OpenClaw${used?' with '+used:''} on this PC.${kept}${quality}`:'Connected. Basic arithmetic and instruction checks passed; answer quality can still vary.';
-        const done=set({phase:'ready',busy:false,verified:true,message,reply:agent?.agentReply||result.reply,error:null,backbone:agent?'openclaw':'ollama',agentId:agent?.agent.id||null,agentDisplayName:agent?.agent.name||null,agentModel:used,note:agent?.nameNote||null});
+        const done=set({phase:'ready',busy:false,verified:true,message,reply:agent?.agentReply||result.reply,error:null,backbone:agent?'openclaw':engine?'llama':'ollama',engine:engine?engine.kind:'ollama',agentId:agent?.agent.id||null,agentDisplayName:agent?.agent.name||null,agentModel:used,note:[agent?.nameNote,startNote].filter(Boolean).join(' ')||null});
         // Only an OpenClaw-verified setup moves chat to OpenClaw; the direct local route never does.
         if(agent)onReady(done);
         return done;
@@ -181,13 +198,18 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,openclaw=null
     if(!rechecked&&saved?.phase==='ready'&&saved.model===model){rechecked=true;await prepare(model,{install:false,agent,probe:false});}
     if(state.busy)return {ok:false,providerId:'local',model,error:'Local setup is still running.'};
     try {
-      if(!await api.reachable()){verifiedModel=null;return {ok:false,providerId:'local',model,error:'Ollama is not running. Resume local setup to start it.'};}
-      if(!await api.installed(model)){verifiedModel=null;return {ok:false,providerId:'local',model,error:'The selected model is not downloaded.'};}
+      if(engine){
+        if(engine.needs(model).needsModel){verifiedModel=null;return {ok:false,providerId:'local',model,error:'The selected model is not downloaded.'};}
+        if(!await engine.running(model)){verifiedModel=null;return {ok:false,providerId:'local',model,error:'The local model server is not running. Resume setup to start it.'};}
+      }else{
+        if(!await api.reachable()){verifiedModel=null;return {ok:false,providerId:'local',model,error:'Ollama is not running. Resume local setup to start it.'};}
+        if(!await api.installed(model)){verifiedModel=null;return {ok:false,providerId:'local',model,error:'The selected model is not downloaded.'};}
+      }
       if(agent&&openclaw&&!await openclaw.gatewayRunning())return {ok:false,providerId:'openclaw',model,error:'The OpenClaw gateway is not running. Resume setup to start it.'};
       return {ok:verifiedModel===model,providerId:agent?'openclaw':'local',model,error:verifiedModel===model?null:'Verify a real reply to finish setup.'};
     }catch(error){verifiedModel=null;return {ok:false,providerId:'local',model,error:error.message};}
   }
   // An explicit connection test sends a real message through OpenClaw when chat goes there.
-  return {prepare,verify:(model,{agent=true}={})=>prepare(model,{install:false,agent,probe:true}),status,needs,get:()=>({...state}),invalidate:()=>{verifiedModel=null;},models:MODELS};
+  return {prepare,verify:(model,{agent=true}={})=>prepare(model,{install:false,agent,probe:true}),status,needs,get:()=>({...state}),invalidate:()=>{verifiedModel=null;},models:engine?engine.models:MODELS};
 }
 module.exports={createLocalApi,createLocalSetup,MODELS,DEFAULT_MODEL,validateModel};

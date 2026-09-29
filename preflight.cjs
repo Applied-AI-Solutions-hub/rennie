@@ -12,10 +12,13 @@ const LARGE_MODEL_MEMORY=7.5*GB;
 const gb=bytes=>(Math.round(bytes/GB*10)/10).toFixed(1).replace(/\.0$/,'');
 // The model goes where Ollama keeps models; everything else goes to the system drive.
 // A custom model's size is unknown before it downloads, so it is left out rather than guessed.
-function parts({needsOllama,needsModel,modelBytes,needsOpenClaw}){
+// Ollama is sized here; the llama.cpp engine reports its own sizes (needsRuntime, runtimeDownloadBytes,
+// runtimeSpaceBytes), and while unpacking, the archive and the unpacked build are on disk together.
+function parts({needsOllama,needsRuntime,runtimeDownloadBytes=0,runtimeSpaceBytes=0,needsModel,modelBytes,needsOpenClaw}){
   const modelKnown=!needsModel||Number.isFinite(modelBytes),model=needsModel&&modelKnown?modelBytes:0;
-  const download=(needsOllama?SIZES.ollamaDownload:0)+model+(needsOpenClaw?0.2*GB:0);
-  return {download,modelKnown,system:(needsOllama?SIZES.ollamaDownload+SIZES.ollamaInstalled:0)+(needsOpenClaw?SIZES.openclaw:0),model:model*1.1,margin:download||!modelKnown?SIZES.margin:0};
+  const runtime=needsRuntime?{download:runtimeDownloadBytes,space:runtimeDownloadBytes+runtimeSpaceBytes}:needsOllama?{download:SIZES.ollamaDownload,space:SIZES.ollamaDownload+SIZES.ollamaInstalled}:{download:0,space:0};
+  const download=runtime.download+model+(needsOpenClaw?0.2*GB:0);
+  return {download,modelKnown,system:runtime.space+(needsOpenClaw?SIZES.openclaw:0),model:model*1.1,margin:download||!modelKnown?SIZES.margin:0};
 }
 function plan(needs){const p=parts(needs);return {download:p.download,space:p.system+p.model+p.margin};}
 // modelFreeBytes is given only when models live on a different drive from the system drive.
