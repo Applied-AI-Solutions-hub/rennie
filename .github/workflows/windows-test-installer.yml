@@ -30,7 +30,7 @@ jobs:
         run: node node_modules/electron/install.js
       - name: Check Host setup
         run: |
-          node --test build/windows-signing.test.cjs host-manager.test.cjs setup.test.cjs updates.test.cjs local-model.test.cjs local-runtime.test.cjs local-chat.test.cjs download.test.cjs preflight.test.cjs openclaw-native.test.cjs branding.test.cjs
+          node --test build/windows-signing.test.cjs host-manager.test.cjs setup.test.cjs updates.test.cjs local-model.test.cjs local-runtime.test.cjs local-chat.test.cjs download.test.cjs preflight.test.cjs openclaw-native.test.cjs branding.test.cjs package.test.cjs build-ui.test.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell -NoProfile -ExecutionPolicy Bypass -File build/host-setup.test.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -38,6 +38,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Check normal chat request path
         run: pnpm exec electron local-chat-smoke.cjs
+      - name: Check chat recovers from a failed save
+        run: pnpm exec electron chat-persist-smoke.cjs
       - name: Check isolated development launch
         run: pnpm exec electron . --foxsocket-dev --fresh --dev-smoke
       - name: Check setup progress at Lenovo window size
@@ -66,8 +68,8 @@ jobs:
           New-Item -ItemType Directory -Path dev-installer | Out-Null
           $package = Get-Content package.json -Raw | ConvertFrom-Json
           $version = $package.version
-          # electron-builder names the installer after the product name, so it follows the rename.
-          $installer = Get-Item -LiteralPath "release/$($package.build.productName) Setup $version.exe"
+          # The installer name comes from build.win.artifactName, which has no spaces so GitHub serves it unrenamed.
+          $installer = Get-Item -LiteralPath ('release/' + $package.build.win.artifactName.Replace('${version}',$version).Replace('${ext}','exe'))
           Copy-Item -LiteralPath $installer.FullName -Destination dev-installer
           $digest = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$digest  $($installer.Name)" | Set-Content dev-installer/SHA256SUMS.txt

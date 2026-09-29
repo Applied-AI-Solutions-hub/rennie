@@ -1,6 +1,11 @@
 # Shared Lenovo handoff — 0.7.0-alpha.1
 
-**0.7.0-alpha.1 is the first build from this repository.** Its code is the alpha.7 development build with the Rennie name; only the version number changed. Rennie was previously Foxsocket.
+**0.7.0-alpha.1 is the first build series from this repository.** Rennie was previously Foxsocket. It started as the alpha.7 development build with the Rennie name. Builds from the community-fixes pull request (#10) onward also change:
+
+- **Installer file name:** `Rennie-Setup-0.7.0-alpha.1.exe` (no spaces), matching the name in SHA256SUMS.txt.
+- **Chat after a failed save** (for example, a full disk): the message is not sent, the conversation says so, and you can send again. Chat no longer stays locked.
+- **Optional WSL Host path:** a Linux environment that is slow to start is reported as "took too long to respond", not as OpenClaw missing.
+- **Smaller installer:** retired files and bundle-only libraries are no longer packaged. Report anything that looks unstyled or missing.
 
 **The owner has chosen to use Lenovo as a development PC.** Continue development with the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** CI artifact or `pnpm dev:fresh`. See [development setup](docs/development.md) (DEVELOPMENT.md in the artifact) for the explicit owner-controlled Windows setting and commands. No signing account is needed for development.
 
@@ -22,7 +27,7 @@ Full record: [docs/openclaw-backbone.md](docs/openclaw-backbone.md). In short:
 
 The user requires a clean install for each Lenovo iteration. Record the actual baseline before testing (Rennie or Foxsocket, Ollama, OpenClaw, Node.js and `%USERPROFILE%\.openclaw` present or not); do not call a partially cleaned state pristine. Preserve unrelated user data and any existing agent profile. Do not manually install a backend to hide a failure.
 
-1. Verify SHA256SUMS.txt and BUILD-INFO.json. Launch the installer from Explorer. Expected: no questions, no administrator prompt, the app opens. Record the install path and any Windows security message.
+1. Verify SHA256SUMS.txt (it names the exact installer file) and BUILD-INFO.json. Launch the installer from Explorer. Expected: no questions, no administrator prompt, the app opens. Record the install path and any Windows security message.
 2. On the setup page, record what "This PC" reports (memory, free space, planned download) and the recommended model.
 3. Enter an assistant name, then choose **Set up my assistant**. Record the exact model.
 4. Watch the six steps. Record: the Ollama welcome window; progress during downloads; any **Windows permission prompt for Node.js** (approve it and record the wording); how long the OpenClaw step takes; whether anything else opens.
