@@ -1,0 +1,19 @@
+name: Windows signed installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signing-status:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - name: Explain pending free signing
+        shell: pwsh
+        run: |
+          "Free signing selected: SignPath Foundation enrollment and integration are pending." >> $env:GITHUB_STEP_SUMMARY
+          "See docs/windows-signing.md. No installer has been signed or published." >> $env:GITHUB_STEP_SUMMARY
+          throw 'Signing unavailable: complete the free SignPath enrollment and reviewed integration first.'

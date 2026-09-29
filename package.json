@@ -1,0 +1,102 @@
+{
+  "name": "foxsocket",
+  "version": "0.7.0-alpha.1",
+  "description": "Rennie personal AI desktop workspace \u2014 your agent, your models, your devices",
+  "license": "MIT",
+  "author": "Applied AI Solutions",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node build-ui.mjs && electron . --foxsocket-dev",
+    "dev:fresh": "node build-ui.mjs && electron . --foxsocket-dev --fresh",
+    "dist:dev": "node build/dev-build.cjs",
+    "start": "node build-ui.mjs && electron .",
+    "package": "node build-ui.mjs && electron-builder --config electron-builder.cjs --win dir",
+    "dist": "node build-ui.mjs && node build/render-maker.cjs && electron-builder --config electron-builder.cjs --win nsis",
+    "build:ui": "node build-ui.mjs",
+    "test:ui": "node build-ui.mjs && electron workspace-smoke.cjs",
+    "test:setup": "node --test setup.test.cjs && powershell -NoProfile -ExecutionPolicy Bypass -File build/host-setup.test.ps1",
+    "render:maker": "node build/render-maker.cjs",
+    "update:local": "powershell -NoProfile -ExecutionPolicy Bypass -File build/update-local.ps1",
+    "test:updates": "node --test updates.test.cjs",
+    "test:host": "node --test host-manager.test.cjs"
+  },
+  "devDependencies": {
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.2",
+    "sharp": "^0.35.4"
+  },
+  "build": {
+    "appId": "solutions.appliedai.commandcenter",
+    "productName": "Rennie",
+    "files": [
+      "LICENSE",
+      "THIRD-PARTY-NOTICES.md",
+      "main.js",
+      "foxsocket-llm.cjs",
+      "foxsocket-providers.cjs",
+      "foxsocket-agent.cjs",
+      "agent/**/*",
+      "setup.js",
+      "docs/fresh-pc-setup.md",
+      "preload.js",
+      "index.html",
+      "style.css",
+      "assets/**/*",
+      "polish.css",
+      "finish.css",
+      "finish.js",
+      "branding.js",
+      "brand-ui.js",
+      "workspace.css",
+      "workspace.js",
+      "workspace-main.js",
+      "updates.js",
+      "updates-main.js",
+      "updates-ui.js",
+      "host-main.js",
+      "host-manager.js",
+      "host-ui.js",
+      "host-ui.css",
+      "build/host-startup.ps1",
+      "starter-agent.json",
+      "local-model.cjs",
+      "local-runtime.cjs",
+      "local-main.cjs",
+      "local-ui.js",
+      "quiet-workspace.css",
+      "local-chat.cjs",
+      "download.cjs",
+      "preflight.cjs",
+      "openclaw-native.cjs"
+    ],
+    "win": {
+      "target": "nsis",
+      "forceCodeSigning": true,
+      "signExts": [
+        ".exe",
+        ".dll",
+        ".node",
+        ".ps1"
+      ],
+      "icon": "assets/icon.ico",
+      "executableName": "Foxsocket"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "shortcutName": "Rennie",
+      "runAfterFinish": true
+    },
+    "directories": {
+      "output": "release"
+    }
+  },
+  "dependencies": {
+    "@awesome.me/webawesome": "^3.12.0",
+    "animejs": "^4.5.0",
+    "motion": "^13.2.0"
+  }
+}

@@ -1,0 +1,123 @@
+/* Flat desktop workspace. Shared surfaces for chat, setup, and settings. */
+:root {
+  --bg: #141414;
+  --panel: #1c1c1c;
+  --line: #303030;
+  --muted: #aaa;
+  --cyan: #e6e6e6;
+  --radius: 8px;
+  background: var(--bg);
+  color: #e6e6e6;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+}
+button { border-radius: 6px; padding: 8px 12px; }
+button:hover { background: #292929; }
+button.primary { background: #e6e6e6; color: #171717; border-color: #e6e6e6; box-shadow: none; }
+button.primary:hover { background: #fff; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline-color: #9ac7ef; }
+button.link, a { color: #9ac7ef; }
+img.icon { width: 18px; height: 18px; opacity: .85; }
+.app, body[data-page="setup"] .app { grid-template-columns: 252px minmax(0,1fr) 280px; }
+.app.details-hidden, body[data-page="setup"] .app { grid-template-columns: 252px minmax(0,1fr); }
+.sidebar { padding: 14px 10px 12px; background: #191919; }
+.brand { flex-direction: row; gap: 9px; text-align: left; padding: 4px 10px 20px; }
+.brand-mark { width: 23px; height: 23px; object-fit: contain; }
+.brand h1 { font-size: 15px; font-weight: 600; letter-spacing: -.2px; }
+.new-chat { justify-content: flex-start; min-height: 36px; margin-bottom: 18px; }
+.section-label { text-transform: none; letter-spacing: 0; font-size: 12px; color: #929292; margin: 8px 10px; }
+.agent-link { background: transparent; border: 0; box-shadow: none; padding: 8px 10px; }
+.agent-link .mascot { width: 23px; height: 23px; border-radius: 6px; }
+.agent-link span { font-weight: 400; font-size: 13px; }
+.agent-link>.icon { width: 15px; }
+.recents { margin-top: 18px; min-height: 60px; }
+.recent { font-size: 13px; padding: 8px 10px; min-height: 34px; }
+.recent.active, .side-nav button.active { background: #2a2a2a; }
+.side-nav { padding-top: 10px; margin-top: 12px; gap: 0; }
+.side-nav button { font-size: 13px; min-height: 35px; padding: 7px 10px; }
+.device-footer { padding: 12px 10px 0; margin-top: 10px; gap: 9px; }
+.device-footer>.icon { width: 19px; height: 19px; }
+.device-footer strong { font-size: 12px; }
+.device-footer small { font-size: 11px; }
+.center { background: var(--bg); }
+.topbar { height: 56px; padding: 10px 22px; gap: 12px; }
+.topbar h2 { font-size: 14px; font-weight: 500; letter-spacing: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .heading small { display: none; }
+.status { background: transparent; border: 0; padding: 6px 8px; font-size: 11px; }
+.dot { width: 6px; height: 6px; }
+.dot.online { background: #83b897; }
+.messages { padding: 28px 32px 10px; }
+.thread { max-width: 780px; }
+.message { margin-bottom: 28px; gap: 0; }
+.message>.mascot, .user-avatar { display: none; }
+.message-content { max-width: 100%; width: 100%; }
+.bubble { padding: 4px 0; border: 0; border-radius: 0; background: transparent; font-size: 15px; line-height: 1.75; }
+.bubble pre { background: #1c1c1c; border: 1px solid var(--line); border-radius: 8px; }
+.message.user .message-content { width: auto; max-width: 90%; }
+.message.user .bubble { background: #242424; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.message time { color: #929292; margin: 7px 0; font-size: 11px; }
+.message-actions { margin-top: 6px; gap: 4px; }
+.message-actions button { border: 0; padding: 5px 7px; color: #aaa; font-size: 11px; }
+.message-actions .icon { width: 14px; height: 14px; }
+.thinking { padding: 12px 0; color: var(--muted); }
+.composer-dock { padding: 12px 32px 16px; width: 100%; max-width: 844px; margin: 0 auto; }
+.compose { background: #222; border: 1px solid #363636; border-radius: 16px; padding: 8px 10px; gap: 10px; box-shadow: none; }
+.compose:focus-within { border-color: #737373; }
+.compose textarea { color: #e6e6e6; min-height: 38px; padding: 8px 0; font-size: 14px; }
+.compose textarea::placeholder { color: #999; }
+.compose #send { width: 34px; height: 34px; padding: 8px; border-radius: 50%; margin-bottom: 2px; }
+.compose>.icon-button { padding: 8px; margin-bottom: 2px; }
+.composer-note { color: #929292; font-size: 10px; padding-top: 9px; }
+.empty-chat { padding: 24px 0 52px; }
+.empty-chat h2 { font-size: 25px; font-weight: 500; letter-spacing: -.5px; }
+.empty-chat p { color: var(--muted); font-size: 14px; }
+.suggestions { max-width: 500px; gap: 8px; margin-top: 26px; }
+.suggestions button { background: transparent; border-color: var(--line); min-height: 42px; font-size: 12px; border-radius: 8px; }
+.suggestions button:hover { background: #222; }
+.details { padding: 24px 20px; background: #191919; }
+.details h2 { font-size: 15px; margin-bottom: 26px; }
+.details p, .detail-label { font-size: 13px; }
+.details .folder-choice, .chip { background: #222; border-color: var(--line); }
+.page-scroll, body[data-page="setup"] .page-scroll { padding: 32px; }
+.page-inner, body[data-page="setup"] .page-inner { max-width: 820px; }
+.page-intro h1 { font-size: 25px; font-weight: 500; }
+.panel, .host-card { background: var(--panel); border-color: var(--line); border-radius: 8px; box-shadow: none; padding: 22px; }
+.panel h2, .host-card h2 { font-size: 17px; }
+.panel p, .host-card p, .host-hero p { color: var(--muted); }
+.panel>p+button, .panel>small+button { margin-top: 12px; }
+.field input, .field select, textarea.notes, .llm-key, #release-token { background: #141414; border: 1px solid #3a3a3a; color: #e6e6e6; border-radius: 6px; padding: 10px 12px; min-width: 0; max-width: 100%; }
+.setting { flex-wrap: wrap; }
+.setting>span { flex: 1 1 230px; }
+.llm-key { flex: 1 1 190px; }
+.role-card { background: #1c1c1c; border-color: #3a3a3a; border-radius: 8px; }
+.role-card.selected { border-color: #aaa; box-shadow: none; }
+.notice, .release-notice { background: #222; border-color: #777; box-shadow: none; color: #ccc; }
+.host-hero { display: block; min-height: 0; padding: 8px 0 24px; }
+.host-hero h1 { font-size: 28px; line-height: 1.25; letter-spacing: -.6px; }
+.host-orbit { display: none; }
+.host-tabs button[aria-current] { color: #eee; }
+.host-tabs button[aria-current]::after { background: #ccc; }
+.host-tag, .stage-mark, .host-callout, .host-explainer, .agent-found { background: #222; border-color: #3a3a3a; border-radius: 6px; }
+.host-stages .current .stage-mark { border-color: #aaa; box-shadow: none; color: #eee; }
+.local-progress progress { accent-color: #b6cbbf; height: 10px; }
+dialog, dialog .dialog-head { background: #1c1c1c; color: #e6e6e6; border-color: #444; border-radius: 10px; }
+dialog::backdrop { background: #0009; }
+#toast { background: #292929; border-color: #555; box-shadow: none; border-radius: 8px; }
+@media (max-width:1200px) {
+  .app, .app.details-hidden, body[data-page="setup"] .app { grid-template-columns: 240px minmax(0,1fr); }
+  .app.details-overlay>.details { top: 56px; background: #191919; box-shadow: none; }
+}
+@media (max-width:760px) {
+  .app, .app.details-hidden, body[data-page="setup"] .app { grid-template-columns: minmax(0,1fr); }
+  .app.sidebar-open .sidebar { box-shadow: none; border-right: 1px solid #555; }
+  .topbar { height: 52px; padding: 8px 12px; }
+  .topbar h2 { font-size: 13px; }
+  .messages { padding: 20px 16px 8px; }
+  .composer-dock { padding: 10px 16px 12px; }
+  .bubble { font-size: 14px; }
+  .page-scroll, body[data-page="setup"] .page-scroll { padding: 22px 16px; }
+  .panel, .host-card { padding: 18px; }
+  .app.details-overlay>.details { top: 52px!important; }
+  .empty-chat h2 { font-size: 23px; }
+  .suggestions { max-width: 320px; }
+}
