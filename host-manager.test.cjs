@@ -3,7 +3,8 @@ const {createManager,clawArgs}=require('./host-manager');
 function fixture(changes={}){
  const flags={runtime:true,configured:true,systemd:true,service:true,running:true,restart:true,enabled:true,linger:true,boot:true,reachable:true,...changes},calls=[],events=[];
  const execute=async(exe,args)=>{calls.push(args);const ok=output=>({ok:true,output}),fail=()=>({ok:false,output:''});
-  if(args.includes('--version'))return flags.runtime?ok('OpenClaw 2026.9.3'):fail();
+  if(args.includes('true'))return ok('');
+  if(args.includes('--version'))return flags.timeout?{ok:false,output:'',timedOut:true}:flags.runtime?ok('OpenClaw 2026.9.3'):fail();
   if(args.includes('ps'))return ok(flags.systemd?'systemd':'init');
   if(args.some(x=>x.startsWith('test -s')))return flags.configured?ok(''):fail();
   if(args.includes('id'))return ok('hostuser');
@@ -30,6 +31,9 @@ test('foreground gateway is not killed or duplicated',async()=>{
 });
 test('fresh runtime install stops at account configuration, never claims ready',async()=>{
  const f=fixture({runtime:false,configured:false,service:false,running:false,reachable:false,boot:false});const r=await f.manager.prepare('Ubuntu-24.04');assert.equal(r.issue,'configuration');assert.equal(r.checks.runtime,true);assert.ok(f.events.some(s=>s.phase==='installing'));assert.ok(!f.calls.some(a=>a.includes('install')));
+});
+test('a probe that times out is reported, never treated as a missing runtime',async()=>{
+ const f=fixture({timeout:true});const r=await f.manager.prepare('Ubuntu-24.04');assert.equal(r.issue,'timeout');assert.equal(r.checks,null);assert.ok(f.calls[0].includes('true'));assert.ok(!f.events.some(s=>s.phase==='installing'));assert.ok(!f.calls.some(a=>a.some(x=>x.includes('https://'))));
 });
 test('unsupported Linux is blocked before downloading',async()=>{
  const f=fixture({systemd:false,runtime:false});const r=await f.manager.prepare('Ubuntu-24.04');assert.equal(r.issue,'systemd');assert.ok(!f.calls.some(a=>a.some(x=>x.includes('https://'))));

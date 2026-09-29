@@ -2,7 +2,7 @@ const {app,ipcMain}=require('electron');
 const {execFile}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path');
 const setup=require('./setup'),{createManager,taskName}=require('./host-manager');
-function execute(exe,args,{timeout=20000}={}){return new Promise(resolve=>execFile(exe,args,{windowsHide:true,timeout,maxBuffer:1024*1024},(error,output)=>resolve({ok:!error,output:error?'':String(output)})));}
+function execute(exe,args,{timeout=20000}={}){return new Promise(resolve=>execFile(exe,args,{windowsHide:true,timeout,maxBuffer:1024*1024},(error,output)=>resolve({ok:!error,output:error?'':String(output),timedOut:!!error?.killed})));}
 module.exports=function register(getWindow,isBusy){
  let finishThenQuit=false;
  const script=()=>{const out=path.join(app.getPath('userData'),'host-startup.ps1');fs.writeFileSync(out,fs.readFileSync(path.join(__dirname,'build','host-startup.ps1')));return out;};
