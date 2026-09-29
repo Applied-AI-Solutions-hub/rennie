@@ -1,6 +1,14 @@
 # Lenovo acceptance test — Rennie 0.7.0-alpha.1
 
-This is the acceptance test for issue #5: a clean PC with no NVIDIA GPU goes from installer to a working assistant on the llama.cpp engine, survives a restart, an upgrade and an uninstall, and never exposes its model server. A pass covers the CPU half of beta criterion 2, plus criteria 3 and 4 ([docs/beta-criteria.md](docs/beta-criteria.md)). It does not cover signing (criterion 1) or the NVIDIA half of criterion 2.
+This is the acceptance test for issue #5 on a PC with no NVIDIA GPU. Each beta criterion ([docs/beta-criteria.md](docs/beta-criteria.md)) is credited only when the parts listed for it have been run and passed. If a part is skipped, report its criterion as untested.
+
+| Criterion | Credited when these pass |
+|---|---|
+| 2, CPU half: clean PC to first reply | Before you start (with OpenClaw absent), A, B, C and D |
+| 3: recovery, uninstall, upgrade | D, F, G and H |
+| 4: troubleshooting | E |
+
+This test does not cover signing (criterion 1) or the NVIDIA half of criterion 2.
 
 **The owner has chosen to use the Lenovo as a development PC**, with Smart App Control off for unsigned development builds. See [development setup](docs/development.md) (DEVELOPMENT.md in the artifact). No signing account is needed. Don't present that setting as a requirement for customers.
 
@@ -12,7 +20,7 @@ Rennie was previously Foxsocket; this is the first build series from this reposi
 - **New model engine (llama.cpp).** On a PC without an NVIDIA GPU, which includes this Lenovo, Rennie downloads the processor build of PrismML's llama.cpp (about 19 MB) and Qwen3.5 4B (about 2.7 GB). Both are pinned and checked against published checksums. They live in `%LOCALAPPDATA%\Rennie\engine`.
 - **Model server.** It listens on this PC only (`127.0.0.1:18080`) and needs a per-install key, which it reads from a file, so the key never appears in a process list. It starts at sign-in through a Task Scheduler task named **Rennie model server**, with no window.
 - **OpenClaw is the assistant.** Rennie installs OpenClaw 2026.9.3 natively on Windows (no Ubuntu/WSL), adds OpenClaw's llama.cpp connector, points it at the model server, and confirms a first reply through OpenClaw. Chat then goes through OpenClaw.
-- **Uninstall** removes the sign-in task, the running server and the engine folder. OpenClaw stays, because it's a separate program. **An upgrade** keeps the engine and model.
+- **Uninstall** removes the sign-in task, Rennie's running server and the engine folder. OpenClaw stays, because it's a separate program. **An upgrade** keeps the engine and model.
 - **Other behavior.** Downloads resume after a stall with no time limit. Disk space is checked before anything downloads. A failed save of a chat message no longer locks chat. OpenClaw doctor and repair are on the setup page.
 
 Full records: [docs/engine-plan.md](docs/engine-plan.md) and [docs/openclaw-backbone.md](docs/openclaw-backbone.md).
@@ -20,10 +28,17 @@ Full records: [docs/engine-plan.md](docs/engine-plan.md) and [docs/openclaw-back
 ## Before you start
 
 1. **Get the installer.** Download the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact from the Windows validation run of the most recently merged pull request. At the time of writing that is #13 (commit `92a9c7d`, the same code as `main` at `0f3c82f`); its artifact expires on 13 October 2026. Extract it. Check that `BUILD-INFO.json` shows that commit and `"signature_status": "NotSigned"`, and that the installer's SHA-256 matches `SHA256SUMS.txt`.
-2. **Record the baseline.** Note whether each of these is present: Rennie or Foxsocket (installed app), `%APPDATA%\Foxsocket`, `%LOCALAPPDATA%\Rennie`, `%USERPROFILE%\.openclaw`, Ollama, Node.js, and a **Rennie model server** task in Task Scheduler. A partially cleaned PC is not "clean"; say what was left.
-3. **Make the test clean without losing anything.** This test needs no earlier Rennie setup and no OpenClaw configuration. An existing OpenClaw configuration is kept and keeps its own model, and a finished Ollama setup keeps Ollama. So:
-   - Uninstall any earlier Rennie or Foxsocket.
+2. **Record the baseline.** Note whether each of these is present:
+   - Rennie or Foxsocket (the installed app), `%APPDATA%\Foxsocket` and `%LOCALAPPDATA%\Rennie`;
+   - OpenClaw: `openclaw --version` in a new terminal, and `%USERPROFILE%\.openclaw`;
+   - Node.js (`node --version`), Ollama, and a **Rennie model server** task in Task Scheduler.
+
+   A partially cleaned PC is not "clean"; say what was left.
+3. **Make the PC clean without losing anything.** The clean pass needs no earlier Rennie setup and no OpenClaw at all. An existing OpenClaw configuration is kept and keeps its own model; an installed OpenClaw is reused, which skips OpenClaw's installer; and a finished Ollama setup keeps Ollama. So:
+   - Uninstall any earlier Rennie or Foxsocket. Keep its installer if you have it, for Part H.
    - Rename `%APPDATA%\Foxsocket` to `Foxsocket.before-acceptance` and `%USERPROFILE%\.openclaw` to `.openclaw.before-acceptance`. **Don't delete them.**
+   - If `openclaw --version` works, remove the OpenClaw program with `npm uninstall -g openclaw` and record it. If you'd rather keep it, go on, but report the OpenClaw installation in step 9 as **untested**. Then the CPU half of criterion 2 is only partly shown.
+   - Node.js may stay. If it's present, report the Node.js permission prompt in step 9 as not applicable.
    - Leave Ollama installed if it's there; this build doesn't use it.
 4. **Record** the Windows version, the Smart App Control state, free space on C:, and memory.
 
@@ -33,7 +48,7 @@ Full records: [docs/engine-plan.md](docs/engine-plan.md) and [docs/openclaw-back
    - *Expected:* no questions, no administrator prompt, and the app opens.
    - *Record:* the install folder and any Windows security message.
 6. **"This PC".** On the setup page, read the "This PC" section.
-   - *Expected:* it recommends **Qwen3.5 4B** with the reason "No supported GPU; using the processor", and plans a download of about 2.8 GB: the engine (19 MB), the model (2.7 GB) and OpenClaw (about 0.2 GB). Setup needs about 6.4 GB free on C:.
+   - *Expected:* it recommends **Qwen3.5 4B** with the reason "No supported GPU; using the processor". It plans a download of about 2.8 GB: the engine (19 MB), the model (2.7 GB) and OpenClaw (about 0.2 GB). Setup needs about 6.4 GB free on C:.
    - *Record:* memory, free space, the planned download, the recommendation and its reason.
 7. **Start setup.** Enter an assistant name, keep Qwen3.5 4B, and choose **Set up my assistant**.
    - *Expected:* six steps, in this order:
@@ -50,6 +65,7 @@ Full records: [docs/engine-plan.md](docs/engine-plan.md) and [docs/openclaw-back
 9. **Watch the rest of setup.**
    - *Expected:*
      - No console window appears at any point.
+     - OpenClaw's installer runs, unless OpenClaw was kept in step 3.
      - Windows may ask permission to install Node.js for OpenClaw. Approve it and record the wording.
      - The OpenClaw step can take 5–15 minutes.
      - The first reply through OpenClaw can take several minutes on the processor; over 10 minutes is a finding.
@@ -72,13 +88,16 @@ Run these in PowerShell. They only read.
     Get-NetTCPConnection -State Listen -LocalPort 18080 | Select-Object LocalAddress
     ```
     *Expected:* only `127.0.0.1`.
-14. **Where the server runs from, and how it gets its key.**
+14. **Where Rennie's server runs from, and how it gets its key.**
     ```powershell
-    Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'" | Select-Object ExecutablePath, CommandLine | Format-List
+    $engine = Join-Path $env:LOCALAPPDATA 'Rennie\engine'
+    Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'" | Where-Object { $_.ExecutablePath -like "$engine\*" } | Select-Object ExecutablePath, CommandLine | Format-List
     ```
     *Expected:*
-    - The path is under `%LOCALAPPDATA%\Rennie\engine`.
+    - One process.
     - The command line has `--api-key-file` and `--no-webui`, and **no** `--api-key` followed by a value.
+
+    This is Rennie's server only; any other llama-server on the PC is ignored.
 15. **What OpenClaw points at.**
     ```powershell
     Select-String -Path "$env:USERPROFILE\.openclaw\openclaw.json" -Pattern 'llama-cpp|127.0.0.1:18080|localModelLean' | Select-Object -ExpandProperty Line
@@ -98,39 +117,74 @@ Run these in PowerShell. They only read.
       Get-ScheduledTaskInfo -TaskName 'Rennie model server' | Select-Object LastRunTime, LastTaskResult
       ```
       *Expected:* it ran at sign-in.
-    - Repeat step 14. *Expected:* the server is already running.
+    - Repeat step 14. *Expected:* one process, so the server is already running.
 19. **After the restart.** Open Rennie and send a message.
     - *Expected:* a reply.
     - *Record:* whether the model server and OpenClaw's gateway came back by themselves, and how long the first reply took.
 
-## Part E — Upgrade
+## Part E — Troubleshooting (required for criterion 4)
 
-20. **Run the same installer again** over the installed app. electron-builder treats that as an upgrade.
+Break one thing at a time on purpose. For each case, record Rennie's exact words. It should say what stopped and what to do in plain language; a generic or misleading message is a finding.
+
+20. **The model server stops.** End Rennie's server:
+    ```powershell
+    $engine = Join-Path $env:LOCALAPPDATA 'Rennie\engine'
+    Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'" | Where-Object { $_.ExecutablePath -like "$engine\*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+    ```
+    Then send a message.
+    - *Expected:* the message doesn't get a normal reply, and Rennie explains what failed.
+    - Open **This PC** and record what it says about the model server. Choose **Resume setup** if it's offered.
+    - *Expected:* the server starts again (step 14 shows one process), and the next message gets a reply.
+21. **OpenClaw's gateway stops.** In a terminal, run `openclaw gateway stop`, then send a message. If that command doesn't exist, record the error and skip to step 22.
+    - *Expected:* no normal reply, and Rennie explains that OpenClaw didn't answer.
+    - Choose **Run OpenClaw doctor** and record its findings. Then choose **Let OpenClaw fix what it can**, or **Resume setup** if no repair is offered.
+    - *Expected:* the gateway runs again, and the next message gets a reply.
+    - *Record:* each message and finding, and whether the repair worked without typing commands.
+
+## Part F — Upgrade to the same build
+
+22. **Run the same installer again** over the installed app. electron-builder treats that as an upgrade.
     - *Expected:*
       - The app reopens.
       - Nothing is downloaded again: the engine and model in `%LOCALAPPDATA%\Rennie\engine` are kept, and the **Rennie model server** task still exists.
       - A message gets a reply.
     - *Record:* the install folder before and after, whether any download started, and the reply.
-21. **Optional, issue #6.** If an older Foxsocket alpha installer is at hand, repeat this test starting from that alpha installed instead of a clean PC. Record the install folder before and after, and whether a second folder or shortcut appears.
 
-## Part F — Uninstall
+## Part G — Uninstall
 
-22. **Uninstall Rennie** from Windows Settings, then check what remains.
+23. **Uninstall Rennie** from Windows Settings, then check what remains.
     - *Expected:*
       - The **Rennie model server** task is gone.
-      - No `llama-server.exe` is running (step 14 returns nothing).
+      - Step 14 returns nothing, because no server runs from Rennie's folder. A llama-server belonging to another program doesn't count.
       - `%LOCALAPPDATA%\Rennie` is gone.
       - OpenClaw and `%USERPROFILE%\.openclaw` remain, because they belong to OpenClaw.
     - *Record:* anything else that remains.
-23. **Restore what you renamed in step 3**, if you want your earlier setup back. Remove the test's OpenClaw configuration first, if you're restoring the old one.
+
+## Part H — Upgrade from the previous alpha (required for criterion 3)
+
+Criterion 3 asks that upgrading from the previous alpha keeps the user's profile and agent. Reinstalling the same build (Part F) doesn't show that.
+
+24. **Install the previous alpha.** Starting from the state Part G left, install the most recent earlier alpha you have: the published 0.6.0-alpha.2 installer the owner keeps, or an alpha.7 development build. Record which one.
+25. **Give it something to keep.** In that alpha, set an assistant name if it offers one, add a task and a note, and send or keep at least one conversation. Record exactly what you created. Close it.
+26. **Install this build over it.**
+    - *Expected:*
+      - One install folder: record it before and after, and whether the old one is removed.
+      - One set of Start menu and desktop shortcuts.
+      - The app opens with the tasks, notes and conversation from step 25 still there.
+      - The assistant name is kept.
+27. **Set up the assistant from there** (steps 6–11).
+    - *Expected:* the same results as the clean pass. OpenClaw's existing configuration from Part A is reused, and its model stays `llama-cpp/qwen3.5-4b`.
+    - *Record:* anything that differs from the clean pass. This also covers issue #6.
+28. **Clean up.** Uninstall, then restore what you renamed in step 3 if you want your earlier setup back. Remove the test's `%USERPROFILE%\.openclaw` first, if you're restoring the old one.
 
 ## Report
 
 Post the report as a comment on issue #5, and on the active pull request if there is one. Include:
 
 - **Build:** the commit, checksum and signature status from `BUILD-INFO.json`.
-- **PC:** the Windows version, Smart App Control state, and the baseline from steps 2–4.
-- **Results by part:** passed, failed or untested for each of Parts A–F, with the step number, what you expected, what happened, and how long it took.
+- **PC:** the Windows version, Smart App Control state, and the baseline from steps 2–4, including whether OpenClaw and Node.js were present.
+- **Results by part:** passed, failed or untested for each of Parts A–H, with the step number, what you expected, what happened, and how long it took.
+- **Criteria:** for each of criteria 2 (CPU), 3 and 4, whether it's shown, partly shown or untested, per the table at the top.
 - **Exact wording:** of error messages, the Node.js prompt and OpenClaw doctor findings.
 - **Manual steps:** anything you had to do by hand.
 
