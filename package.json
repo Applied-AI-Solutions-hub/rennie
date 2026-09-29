@@ -1,7 +1,7 @@
 {
   "name": "foxsocket",
   "version": "0.7.0-alpha.1",
-  "description": "Rennie personal AI desktop workspace \u2014 your agent, your models, your devices",
+  "description": "Rennie personal AI desktop workspace — your agent, your models, your devices",
   "license": "MIT",
   "author": "Applied AI Solutions",
   "main": "main.js",
@@ -21,9 +21,12 @@
     "test:host": "node --test host-manager.test.cjs"
   },
   "devDependencies": {
+    "@awesome.me/webawesome": "^3.12.0",
+    "animejs": "^4.5.0",
     "electron": "^40.0.0",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.28.2",
+    "motion": "^13.2.0",
     "sharp": "^0.35.4"
   },
   "build": {
@@ -90,10 +93,5 @@
     "directories": {
       "output": "release"
     }
-  },
-  "dependencies": {
-    "@awesome.me/webawesome": "^3.12.0",
-    "animejs": "^4.5.0",
-    "motion": "^13.2.0"
   }
 }
