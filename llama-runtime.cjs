@@ -22,10 +22,11 @@ const BUILDS=Object.freeze({
 });
 // Hugging Face files pinned to a repository revision, best first. The first
 // model this PC can run is chosen. AMD and Intel GPUs use the processor tier
-// until they are tested (PrismML lists open Vulkan problems for Bonsai files).
+// until they are tested (PrismML lists open Vulkan problems for Bonsai files). Each cutoff leaves room above the
+// measured 32K-context footprint (Bonsai 2: 9.1 GB; Qwen3.5 9B: 6,191 MiB, more than a 6 GB card's 6,144 MiB).
 const MODELS=Object.freeze([
  {id:'bonsai-2-27b',label:'Ternary Bonsai 2 27B',build:'cuda',minVideoMemory:11.5*GB,repo:'prism-ml/Ternary-Bonsai-2-27B-gguf',revision:'b072e1d3b35a0a630cece372c2127528e0994386',file:'Ternary-Bonsai-2-27B-PQ2_0.gguf',bytes:7206168928,sha256:'3907dc1658db1f78a9826bf8d5bcb8dc65db0d466388937af57f2294fae62ec1',reasoning:'medium'},
- {id:'qwen3.5-9b',label:'Qwen3.5 9B',build:'cuda',minVideoMemory:5.5*GB,repo:'unsloth/Qwen3.5-9B-GGUF',revision:'3885219b6810b007914f3a7950a8d1b469d598a5',file:'Qwen3.5-9B-Q4_K_M.gguf',bytes:5680522464,sha256:'03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8'},
+ {id:'qwen3.5-9b',label:'Qwen3.5 9B',build:'cuda',minVideoMemory:7.5*GB,repo:'unsloth/Qwen3.5-9B-GGUF',revision:'3885219b6810b007914f3a7950a8d1b469d598a5',file:'Qwen3.5-9B-Q4_K_M.gguf',bytes:5680522464,sha256:'03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8'},
  {id:'qwen3.5-4b',label:'Qwen3.5 4B',build:'cpu',minVideoMemory:0,repo:'unsloth/Qwen3.5-4B-GGUF',revision:'e87f176479d0855a907a41277aca2f8ee7a09523',file:'Qwen3.5-4B-Q4_K_M.gguf',bytes:2740937888,sha256:'00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4'},
 ]);
 const modelUrl=model=>`https://huggingface.co/${model.repo}/resolve/${model.revision}/${model.file}`;
@@ -143,6 +144,8 @@ function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeIm
       if(failed)throw Error('The local model server stopped while starting. Details are in llama-server.log in the Rennie data folder. Retry setup; if it keeps stopping, restart Windows.');
       if(await status(id)==='ours')return {started:true,pid:child.pid};
     }
+    // Never leave a half-started server behind: it would hold the port and memory.
+    await stop();
     throw Error('The local model server did not become ready. Retry setup or restart Windows.');
   }
   // Stops only the server this runtime started, and only if that process is still llama-server.

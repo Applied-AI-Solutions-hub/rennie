@@ -115,7 +115,7 @@ A new conversation reuses the cached OpenClaw prompt. Bonsai 2 and Qwen3.5, whic
 | PC | Model | Why |
 | --- | --- | --- |
 | NVIDIA GPU with at least 12 GB video memory | Bonsai 2 27B `PQ2_0` (7.2 GB) | Best quality, fastest thinking, 16 s cold / 3 s per new conversation. It needs about 9 GB of video memory at 32K context. |
-| NVIDIA GPU with 6–11 GB | Qwen3.5 9B (5.7 GB) | Ties Bonsai 2 with thinking off, fits in 6.2 GB of video memory. |
+| NVIDIA GPU with 8–11 GB | Qwen3.5 9B (5.7 GB) | Ties Bonsai 2 with thinking off. It uses 6.2 GB of video memory at 32K context, more than a 6 GB card has, so 6 GB cards use the processor tier. |
 | No NVIDIA GPU, 8 GB of RAM or more | Qwen3.5 4B (2.7 GB) | Fastest prompt reading on a CPU and the best cache reuse; 13/14 on the harder tasks with thinking off. |
 | Under 8 GB of RAM | Qwen3.5 4B, with a warning | Anything smaller failed tool calls or instructions. |
 
@@ -141,11 +141,11 @@ Only the local half of this was tested: the API key, and OpenClaw reaching a lla
    - Check `/health`, and send a warm-up request after start.
 
    **Status (2026-09-29): module written, not yet wired into setup.** `llama-runtime.cjs` has unit tests in `llama-runtime.test.cjs` and was checked once against the real pinned CPU build on the development PC. That check verified the model's checksum, started the server, got "12" for 7 + 5, got 401 without the key or with a wrong key, confirmed it listened on 127.0.0.1 only, and stopped the server cleanly. Differences from the sketch above:
-   - **Three tiers:** Bonsai 2 27B at 12 GB or more of video memory, Qwen3.5 9B at 6 GB or more, and otherwise Qwen3.5 4B on the processor. AMD and Intel GPUs use the processor tier.
+   - **Three tiers:** Bonsai 2 27B at 12 GB or more of video memory, Qwen3.5 9B at 8 GB or more (its measured footprint is 6,191 MiB), and otherwise Qwen3.5 4B on the processor. AMD and Intel GPUs use the processor tier.
    - **Pinned downloads:** Hugging Face files are pinned to a repository revision, not `main`.
    - **Key file:** the key is passed with `--api-key-file`, so it never appears in a process list. The web UI is off (`--no-webui`).
    - **Model alias:** the model is served under a fixed alias. Rennie treats a server as its own only when it accepts this install's key and serves that alias, so another program on port 18080 is never mistaken for it.
-   - **Still to do:** the sign-in Scheduled Task (the server is started by the app for now), the install location, and the warm-up request. The warm-up is covered in practice by OpenClaw's first reply check.
+   - **Still to do:** nothing calls this module yet, so setup still uses Ollama. Next come starting the server from setup and at sign-in (a Scheduled Task), the install location, and the warm-up request. The warm-up is covered in practice by OpenClaw's first reply check.
 2. **OpenClaw setup:**
    - Install `@openclaw/llama-cpp-provider`.
    - Onboard with `llama-cpp-existing-server`.

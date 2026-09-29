@@ -7,7 +7,7 @@ const files={'engine.zip':'engine bytes','cudart.zip':'cuda runtime','cpu.zip':'
 const builds={cuda:{archives:[{file:'engine.zip',bytes:12,sha256:hash('engine bytes')},{file:'cudart.zip',bytes:12,sha256:hash('cuda runtime')}]},cpu:{archives:[{file:'cpu.zip',bytes:10,sha256:hash('cpu engine')}]}};
 const made=[];process.on('exit',()=>{for(const dir of made)fs.rmSync(dir,{recursive:true,force:true});});
 const models=[{id:'small',label:'Small',build:'cpu',minVideoMemory:0,file:'small.gguf',bytes:13,sha256:hash('model weights')}];
-function fixture({serve=files,server={}}={}){
+function fixture({serve=files,server={},ready=true}={}){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'rennie-llama-')),calls=[],spawned=[],killed=new Set();made.push(directory);
   const state={health:null,models:[],key:null,...server};
   const fetchImpl=async(url,options={})=>{
@@ -26,7 +26,7 @@ function fixture({serve=files,server={}}={}){
   };
   const spawnImpl=(exe,args)=>{const child=new EventEmitter();child.pid=4242;child.unref=()=>{};spawned.push({exe,args});
     // The server comes up with this install's key and the requested model.
-    setImmediate(()=>{state.health=200;state.key=fs.readFileSync(args[args.indexOf('--api-key-file')+1],'utf8').trim();state.models=[args[args.indexOf('--alias')+1]];});return child;};
+    if(ready)setImmediate(()=>{state.health=200;state.key=fs.readFileSync(args[args.indexOf('--api-key-file')+1],'utf8').trim();state.models=[args[args.indexOf('--alias')+1]];});return child;};
   const runtime=createLlamaRuntime({directory,fetchImpl,executeImpl,spawnImpl,platformName:'win32',builds,models,releaseUrl:'https://example.test/release/',urlFor:m=>'https://example.test/models/'+m.file,sleep:()=>new Promise(r=>setImmediate(r)),wait:async()=>{},startTimeoutMs:2000});
   return {directory,runtime,calls,spawned,state};
 }
@@ -35,7 +35,8 @@ test('the model tier follows the GPU, its driver and its video memory',()=>{
   const nvidia=(mib,driver='616.92')=>({gpu:{name:'NVIDIA GeForce RTX',videoMemory:mib*1024**2,driver},totalMemory:32*GB});
   assert.equal(choose(nvidia(16311)).model,'bonsai-2-27b');
   assert.equal(choose(nvidia(12288)).model,'bonsai-2-27b','a 12 GB card reports 12288 MiB');
-  assert.equal(choose(nvidia(8188)).model,'qwen3.5-9b');
+  assert.equal(choose(nvidia(8188)).model,'qwen3.5-9b','an 8 GB card reports 8188 MiB');
+  assert.equal(choose(nvidia(6144)).model,'qwen3.5-4b','a 6 GB card is below the 9B model’s measured 6,191 MiB');
   assert.equal(choose(nvidia(4096)).model,'qwen3.5-4b');
   const old=choose(nvidia(16311,'531.18'));assert.equal(old.model,'qwen3.5-4b');assert.equal(old.build,'cpu');assert.match(old.reason,/driver 551\.78 or newer/);
   const none=choose({gpu:null,totalMemory:7.7*GB});assert.equal(none.model,'qwen3.5-4b');assert.equal(none.lowMemory,false,'an 8 GB PC is not flagged');
@@ -96,4 +97,10 @@ test('stop only ends the process it started, and only while it is still llama-se
   const f=fixture();await f.runtime.install('small');await f.runtime.start('small');
   assert.equal(await f.runtime.stop(),true);assert.equal(f.calls.filter(c=>Array.isArray(c)&&c[0]==='tasklist.exe').length,2,'it checks that the process has exited');assert.ok(f.calls.some(c=>Array.isArray(c)&&c[0]==='taskkill.exe'&&c.includes('4242')));
   assert.equal(await f.runtime.stop(),false,'nothing is stopped without a record of our own process');
+});
+test('a server that never becomes ready is stopped, not left running',async()=>{
+  const f=fixture({ready:false});await f.runtime.install('small');
+  await assert.rejects(f.runtime.start('small'),/did not become ready/);
+  assert.ok(f.calls.some(c=>Array.isArray(c)&&c[0]==='taskkill.exe'&&c.includes('4242')),'the started process is ended');
+  assert.ok(!fs.existsSync(path.join(f.directory,'server.pid')));
 });
