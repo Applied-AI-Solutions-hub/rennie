@@ -38,6 +38,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Check normal chat request path
         run: pnpm exec electron local-chat-smoke.cjs
+      - name: Check chat recovers from a failed save
+        run: pnpm exec electron chat-persist-smoke.cjs
       - name: Check isolated development launch
         run: pnpm exec electron . --foxsocket-dev --fresh --dev-smoke
       - name: Check setup progress at Lenovo window size
