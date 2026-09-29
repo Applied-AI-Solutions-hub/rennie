@@ -139,6 +139,13 @@ Only the local half of this was tested: the API key, and OpenClaw reaching a lla
    - Download the model from Hugging Face and check its SHA-256, using `download.cjs`, which handled 30 GB of real downloads in this test.
    - Run `llama-server` as a per-user Scheduled Task at sign-in, bound to loopback, with `-c 32768 --jinja -fa on -np 1 --reasoning-format deepseek --api-key <per-install key>` and `-ngl 99` on a GPU.
    - Check `/health`, and send a warm-up request after start.
+
+   **Status (2026-09-29): module written, not yet wired into setup.** `llama-runtime.cjs` has unit tests in `llama-runtime.test.cjs` and was checked once against the real pinned CPU build on the development PC. That check verified the model's checksum, started the server, got "12" for 7 + 5, got 401 without the key or with a wrong key, confirmed it listened on 127.0.0.1 only, and stopped the server cleanly. Differences from the sketch above:
+   - **Three tiers:** Bonsai 2 27B at 12 GB or more of video memory, Qwen3.5 9B at 6 GB or more, and otherwise Qwen3.5 4B on the processor. AMD and Intel GPUs use the processor tier.
+   - **Pinned downloads:** Hugging Face files are pinned to a repository revision, not `main`.
+   - **Key file:** the key is passed with `--api-key-file`, so it never appears in a process list. The web UI is off (`--no-webui`).
+   - **Model alias:** the model is served under a fixed alias. Rennie treats a server as its own only when it accepts this install's key and serves that alias, so another program on port 18080 is never mistaken for it.
+   - **Still to do:** the sign-in Scheduled Task (the server is started by the app for now), the install location, and the warm-up request. The warm-up is covered in practice by OpenClaw's first reply check.
 2. **OpenClaw setup:**
    - Install `@openclaw/llama-cpp-provider`.
    - Onboard with `llama-cpp-existing-server`.
