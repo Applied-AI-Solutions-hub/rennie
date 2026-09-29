@@ -6,30 +6,20 @@ Formerly Foxsocket. Rennie is the product and the default name for new agents; e
 
 Open-source personal AI desktop workspace by [Applied AI Solutions](https://appliedai.solutions), with its fox mascot.
 
-This is an **early Windows alpha** for testers. It is not a finished agent hosting platform yet.
+This is an **early Windows alpha (0.7.0-alpha.1)** for testers. It is not a finished agent hosting platform yet. What it takes to reach beta: [beta criteria](docs/beta-criteria.md).
 
-> **Lenovo testing blocked: the alpha.6 installer is unsigned and Windows Application Control rejected it.** Do not retry that artifact. [PR #33](https://github.com/Applied-AI-Solutions-hub/foxsocket/pull/33) tracks the fixes and [shared test instructions](LENOVO-START-HERE.md). New distributable builds require verified publisher signatures; [one-time signing setup](docs/windows-signing.md) is still pending. The public alpha.2 release below is historical and does not fix this policy block.
+This repository starts from Foxsocket's final snapshot. The earlier history, releases and pull requests are kept in the archived predecessor repository.
 
 ## Quick start (Windows testers)
 
-**Developing Rennie now:** the Lenovo is an owner-selected development PC. Use the current PR's **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact, or run `pnpm dev:fresh` from source. [Development setup and Windows policy instructions](docs/development.md). Free public signing is a separate task and does not prevent development.
+**No Rennie installer has been released yet.** Installers are unsigned until the free SignPath Foundation signing is set up ([signing status](docs/windows-signing.md)), and Smart App Control blocks unsigned installers.
 
-**The published installer below predates the rename and still uses Foxsocket branding. A Rennie installer has not been released yet.**
-
-1. Download the installer: [**Foxsocket.Setup.0.6.0-alpha.2.exe**](https://github.com/Applied-AI-Solutions-hub/foxsocket/releases/download/v0.6.0-alpha.2/Foxsocket.Setup.0.6.0-alpha.2.exe)
-2. Run it, pick an install location, then launch the legacy Foxsocket alpha.
-3. Choose **Host** to assess this PC for running an agent (or **Client** if you are joining another Host).
-4. On the Host page, inspect what is missing — that readiness report is a core test.
-
-Release page (notes + checksums): [v0.6.0-alpha.2](https://github.com/Applied-AI-Solutions-hub/foxsocket/releases/tag/v0.6.0-alpha.2)
-
-Optional integrity check: download [`SHA256SUMS.txt`](https://github.com/Applied-AI-Solutions-hub/foxsocket/releases/download/v0.6.0-alpha.2/SHA256SUMS.txt) from the same release.
+- **Development PCs:** use the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact from the current pull request's CI run, or run `pnpm dev:fresh` from source. See [development setup and Windows policy instructions](docs/development.md) and the [tester handoff](LENOVO-START-HERE.md).
 
 ### Installer notes
 
 - No GitHub account, Git, Node.js, or OneDrive is required to install the app.
-- Windows x64 only. The installer is **unsigned**. If Windows or SmartScreen blocks it, **record the exact message** in your test report — do **not** disable Windows protection.
-- Prefer the `.exe` installer. The source ZIP on the release is for developers.
+- Windows x64 only. Development installers are **unsigned**. If Windows or SmartScreen blocks one, **record the exact message** in your test report — do **not** disable Windows protection.
 
 ## What to test
 
@@ -45,7 +35,7 @@ Focus on these paths:
 
 ### In this alpha
 
-- **OpenClaw is the backbone (alpha.7 development build).** One setup button installs Ollama and a local model, then installs OpenClaw natively on Windows (no Ubuntu/WSL), configures it for that model, and confirms a first reply through OpenClaw. Chat then goes through OpenClaw. See [what changed and what is still being tested](docs/openclaw-backbone.md).
+- **OpenClaw is the backbone (since the alpha.7 development build).** One setup button installs Ollama and a local model, then installs OpenClaw natively on Windows (no Ubuntu/WSL), configures it for that model, and confirms a first reply through OpenClaw. Chat then goes through OpenClaw. See [what changed and what is still being tested](docs/openclaw-backbone.md).
 - One-click installer with no questions; disk space and memory checked before any download; downloads that resume after a stall with no time limit; OpenClaw doctor and repair from the setup page.
 - Native Windows local-model setup with Ollama installation, model downloads, a real selected-model reply check, and persistent Resume setup navigation.
 - Desktop install and workspace basics (tasks, notes, folders, settings)
@@ -71,7 +61,7 @@ More Host detail: [Host implementation status](docs/managed-host.md).
 
 [Open an issue](https://github.com/Applied-AI-Solutions-hub/rennie/issues/new) and include:
 
-- App version (`0.6.0-alpha.2` or what About shows)
+- App version (`0.7.0-alpha.1` or what About shows)
 - Windows version
 - Host or Client
 - Steps, expected result, actual result

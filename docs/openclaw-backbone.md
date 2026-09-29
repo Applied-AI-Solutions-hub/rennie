@@ -76,5 +76,5 @@ On the development PC (Windows 11). **Nothing was installed on it**; the owner's
 ## Next steps
 
 - **Owner:** submit the SignPath Foundation application. Without signing, no beginner on a protected Windows 11 PC can run the installer.
-- **Lenovo:** run the test plan in [LENOVO-START-HERE.md](../LENOVO-START-HERE.md) and report on PR #33.
+- **Lenovo:** run the test plan in [LENOVO-START-HERE.md](../LENOVO-START-HERE.md) and report on the active pull request.
 - **Development:** decide on Ollama's standalone zip (finding 6); build the skills library on OpenClaw skills (PR #33 milestone) instead of a separate catalog.

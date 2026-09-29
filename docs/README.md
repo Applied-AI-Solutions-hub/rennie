@@ -4,7 +4,8 @@ Reviewed 2026-09-11 against main `64da418`. The published release, current sourc
 
 ## Getting started and current source
 
-- [Project overview and released installer](../README.md)
+- [Project overview](../README.md)
+- [Beta criteria: what Rennie needs before leaving alpha](beta-criteria.md)
 - [Fresh-PC setup and limitations](fresh-pc-setup.md)
 - [OpenClaw backbone and installer fixes (alpha.7): decision, changes, verification](openclaw-backbone.md)
 - [Moving the model engine to llama.cpp: test results and plan (2026-09-28)](engine-plan.md)
