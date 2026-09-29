@@ -45,6 +45,16 @@ Section
   ${If} $1 == "@ROOT@\Agent Workspace\Foxsocket"
     FileWrite $8 "current-pass$\r$\n"
   ${EndIf}
+  ; Since the rename the program is Rennie.exe, and that installation is an upgrade too.
+  CreateDirectory "@ROOT@\Rennie"
+  FileOpen $9 "@ROOT@\Rennie\Rennie.exe" w
+  FileClose $9
+  WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation "@ROOT@\Rennie"
+  !insertmacro FoxsocketPruneStaleLocation HKCU
+  ReadRegStr $1 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  ${If} $1 == "@ROOT@\Rennie"
+    FileWrite $8 "renamed-pass$\r$\n"
+  ${EndIf}
   DeleteRegKey HKCU "${INSTALL_REGISTRY_KEY}"
   FileClose $8
 SectionEnd
@@ -56,5 +66,5 @@ if($LASTEXITCODE -ne 0){throw 'NSIS identity harness did not compile'}
 $process=Start-Process -FilePath (Join-Path $testRoot 'test.exe') -WindowStyle Hidden -Wait -PassThru
 if($process.ExitCode -ne 0){throw 'NSIS identity harness failed'}
 $result=Get-Content (Join-Path $testRoot 'result.txt')
-if(($result -join ',') -ne 'stale-pass,legacy-pass,current-pass'){throw "Unexpected identity result: $result"}
-Write-Output 'Installer identity checks passed: stale registration, legacy executable, current nested installation.'
+if(($result -join ',') -ne 'stale-pass,legacy-pass,current-pass,renamed-pass'){throw "Unexpected identity result: $result"}
+Write-Output 'Installer identity checks passed: stale registration, legacy executable, current nested installation, renamed Rennie.exe installation.'

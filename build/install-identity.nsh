@@ -3,7 +3,8 @@
 !macro FoxsocketPruneStaleLocation root
   ReadRegStr $0 ${root} "${INSTALL_REGISTRY_KEY}" "InstallLocation"
   ${If} $0 != ""
-    ${IfNot} ${FileExists} "$0\Foxsocket.exe"
+    ${IfNot} ${FileExists} "$0\Rennie.exe"
+    ${AndIfNot} ${FileExists} "$0\Foxsocket.exe"
     ${AndIfNot} ${FileExists} "$0\Agent Workspace.exe"
     ${AndIfNot} ${FileExists} "$0\Applied AI Command Center.exe"
       DeleteRegValue ${root} "${INSTALL_REGISTRY_KEY}" "InstallLocation"

@@ -26,7 +26,7 @@ $powerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powersh
 $wsl = Join-Path $env:SystemRoot 'System32\wsl.exe'
 if (!(Test-Path -LiteralPath $AppPath)) {
     Remove-ItemProperty -Path $runKey -Name 'FoxsocketHostSetup' -ErrorAction SilentlyContinue
-    [Windows.Forms.MessageBox]::Show('Foxsocket is no longer at its installation location. Reinstall Foxsocket to resume Host setup. Linux has been preserved.', 'Foxsocket setup') | Out-Null
+    [Windows.Forms.MessageBox]::Show('Rennie is no longer at its installation location. Reinstall Rennie to resume Host setup. Linux has been preserved.', 'Rennie setup') | Out-Null
     $mutex.ReleaseMutex(); $mutex.Dispose(); exit 1
 }
 $script:progress = @{ phase = 'start'; boot = ''; ownsUbuntu = $false }
@@ -35,7 +35,7 @@ if (Test-Path -LiteralPath $stateFile) {
     try {
         $saved = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
         $script:progress = @{ phase = $saved.phase; boot = $saved.boot; ownsUbuntu = ($saved.ownsUbuntu -eq $true); message = $saved.message; lastError = $saved.lastError }
-    } catch { [System.Windows.Forms.MessageBox]::Show('Saved Host setup could not be read. No Linux environment has been changed.', 'Foxsocket setup') | Out-Null; exit 1 }
+    } catch { [System.Windows.Forms.MessageBox]::Show('Saved Host setup could not be read. No Linux environment has been changed.', 'Rennie setup') | Out-Null; exit 1 }
 }
 function Save-Progress {
     $script:progress | ConvertTo-Json | Set-Content -LiteralPath ($stateFile + '.tmp') -Encoding UTF8
@@ -152,7 +152,7 @@ function Require-Success($Result, [string]$Step) {
 function Request-Restart([string]$Boot) {
     $script:progress.phase = 'restart'; $script:progress.boot = $Boot
     Save-Progress; Set-Resume $true
-    Write-Stage 'Windows needs a restart. Save your work, then choose Restart Windows. Foxsocket setup will reopen after you sign in to this account.'
+    Write-Stage 'Windows needs a restart. Save your work, then choose Restart Windows. Rennie setup will reopen after you sign in to this account.'
     $script:nextAction = 'restart'; $action.Text = 'Restart Windows'
 }
 function Start-HostSetup {
@@ -163,8 +163,8 @@ function Start-HostSetup {
     if ($step -eq 'restart') { Request-Restart $boot; return }
     if ($step -eq 'existing') {
         Set-Resume $false
-        Write-Stage ('Linux is already installed: ' + ($distros -join ', ') + '. Continue in Foxsocket to choose and check your environment. Existing accounts and files have been preserved.')
-        $script:nextAction = 'open'; $action.Text = 'Open Foxsocket'; return
+        Write-Stage ('Linux is already installed: ' + ($distros -join ', ') + '. Continue in Rennie to choose and check your environment. Existing accounts and files have been preserved.')
+        $script:nextAction = 'open'; $action.Text = 'Open Rennie'; return
     }
     if ($step -eq 'windows' -and (Test-Path -LiteralPath $wsl)) {
         Write-Stage 'Checking whether Windows already supports Linux.'
@@ -198,7 +198,7 @@ function Start-HostSetup {
         if (@(Get-Distros) -notcontains 'Ubuntu-24.04') { throw 'Ubuntu has not registered yet. Choose Try again to finish installation.' }
     }
     $script:progress.phase = 'initialize'; Save-Progress
-    Write-Stage 'Creating the Foxsocket Linux account and enabling its background service manager.'
+    Write-Stage 'Creating the Linux account Rennie uses (named foxsocket) and enabling its background service manager.'
     $result = Invoke-SetupProcess $wsl '-d Ubuntu-24.04 -u root --exec sh -s' (Get-HostSetupLinuxScript)
     Require-Success $result 'Ubuntu account setup'
     Require-Success (Invoke-SetupProcess $wsl '--terminate Ubuntu-24.04' -TimeoutSeconds 60) 'Ubuntu restart'
@@ -207,19 +207,19 @@ function Start-HostSetup {
     Require-Success $result 'Ubuntu verification'
     if ($result.output -notmatch '(?m)^foxsocket\s*$' -or $result.output -notmatch '(?m)^systemd\s*$') { throw 'Ubuntu is installed but its account or background service manager is not ready. Choose Try again.' }
     $script:progress.phase = 'complete'; $script:progress.ownsUbuntu = $false; Save-Progress; Set-Resume $false
-    Write-Stage 'Ubuntu is ready. Continue in Foxsocket to prepare OpenClaw and connect your AI account. A model reply is still required to finish agent setup.'
-    $script:nextAction = 'open'; $action.Text = 'Open Foxsocket'
+    Write-Stage 'Ubuntu is ready. Continue in Rennie to prepare OpenClaw and connect your AI account. A model reply is still required to finish agent setup.'
+    $script:nextAction = 'open'; $action.Text = 'Open Rennie'
 }
 
 $form = New-Object Windows.Forms.Form
-$form.Text = 'Foxsocket - Prepare this Host'
+$form.Text = 'Rennie - Prepare this Host'
 $form.ClientSize = New-Object Drawing.Size(650, 475)
 $form.StartPosition = 'CenterScreen'
 $form.Font = New-Object Drawing.Font('Segoe UI', 10)
 $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false
 $status = New-Object Windows.Forms.Label
 $status.SetBounds(24, 20, 602, 75)
-$status.Text = 'Foxsocket will prepare Windows and Ubuntu for your agent. Windows may ask for administrator permission and a restart. Your existing Linux environments will be preserved.'
+$status.Text = 'Rennie will prepare Windows and Ubuntu for your agent. Windows may ask for administrator permission and a restart. Your existing Linux environments will be preserved.'
 $log = New-Object Windows.Forms.TextBox
 $log.SetBounds(24, 105, 602, 240); $log.Multiline = $true; $log.ReadOnly = $true; $log.ScrollBars = 'Vertical'
 $activity = New-Object Windows.Forms.ProgressBar
@@ -241,10 +241,10 @@ $action.Add_Click({
     $script:busy = $true; $action.Enabled = $false; $later.Enabled = $false
     try {
         if ($script:nextAction -eq 'restart') {
-            $answer = [Windows.Forms.MessageBox]::Show('Save your work first. Restart Windows now?', 'Foxsocket setup', 'YesNo', 'Question')
+            $answer = [Windows.Forms.MessageBox]::Show('Save your work first. Restart Windows now?', 'Rennie setup', 'YesNo', 'Question')
             if ($answer -eq 'Yes') { Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\shutdown.exe') -ArgumentList '/r /t 0' -WindowStyle Hidden }
         } elseif ($script:nextAction -eq 'open') {
-            if (!(Test-Path -LiteralPath $AppPath)) { throw 'Foxsocket could not be found. Reinstall the app to continue. Ubuntu has been preserved.' }
+            if (!(Test-Path -LiteralPath $AppPath)) { throw 'Rennie could not be found. Reinstall the app to continue. Ubuntu has been preserved.' }
             Start-Process -FilePath $AppPath -ArgumentList '--host-setup' -WindowStyle Normal
             $script:busy = $false; $form.Close()
         } else { Start-HostSetup }

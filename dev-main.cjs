@@ -11,7 +11,7 @@ const profile = process.argv.includes('--fresh')
 fs.mkdirSync(profile, { recursive: true });
 app.setPath('userData', profile);
 process.chdir(root);
-console.log(`Foxsocket development profile: ${profile}`);
+console.log(`Rennie development profile: ${profile}`);
 console.log('Separate app data; installed runtimes and models on this PC are still shared.');
 if (process.argv.includes('--dev-smoke')) {
   const { BrowserWindow } = require('electron');

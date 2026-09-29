@@ -23,11 +23,21 @@ test('bundled Rennie templates never overwrite existing agent identity or graph'
   assert.equal(JSON.parse(fs.readFileSync(graph)).nodes[0].id,'saved');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
-test('display rename retains the old profile path before app modules load',()=>{
+test('the profile lives in %APPDATA%\\Rennie, and one from before the rename is moved there once',()=>{
  const prefix=fs.readFileSync(path.join(__dirname,'main.js'),'utf8').split('let win,tray')[0];
- const start=userData=>{const calls=[];const app={getName:()=>'Rennie',getPath:name=>name==='userData'?userData:'/existing-appdata',setPath:(...args)=>calls.push(args)};vm.runInNewContext(prefix,{process:{argv:[]},require:name=>name==='electron'?{app}:require(name)});return calls;};
- assert.deepEqual(start(path.join('/existing-appdata','Rennie')),[['userData',path.join('/existing-appdata','Foxsocket')]]);
- assert.deepEqual(start('/qa/profile'),[],'a profile chosen before startup, as the smoke tests do, is kept');
- const pkg=require('./package.json');assert.equal(pkg.name,'foxsocket');assert.equal(pkg.build.appId,'solutions.appliedai.commandcenter');
- assert.equal(pkg.build.productName,'Rennie');assert.equal(pkg.build.win.executableName,'Foxsocket');
+ const start=(appData,userData=path.join(appData,'Rennie'),argv=[])=>{const calls=[];const app={isPackaged:argv.length>0,getName:()=>'Rennie',getPath:name=>name==='userData'?userData:appData,setPath:(...args)=>calls.push(args)};vm.runInNewContext(prefix,{process:{argv},require:name=>name==='electron'?{app}:require(name)});return calls;};
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'rennie profile-'));
+ try{
+  const moved=path.join(root,'moved');fs.mkdirSync(path.join(moved,'Foxsocket'),{recursive:true});fs.writeFileSync(path.join(moved,'Foxsocket','state.json'),'{"chat":[1]}');
+  assert.deepEqual(start(moved),[['userData',path.join(moved,'Rennie')]]);
+  assert.equal(fs.readFileSync(path.join(moved,'Rennie','state.json'),'utf8'),'{"chat":[1]}','the old profile moved intact');assert.ok(!fs.existsSync(path.join(moved,'Foxsocket')),'nothing is left behind half-moved');
+  const both=path.join(root,'both');for(const name of ['Rennie','Foxsocket']){fs.mkdirSync(path.join(both,name),{recursive:true});fs.writeFileSync(path.join(both,name,'state.json'),name);}
+  assert.deepEqual(start(both),[['userData',path.join(both,'Rennie')]]);assert.equal(fs.readFileSync(path.join(both,'Foxsocket','state.json'),'utf8'),'Foxsocket','an existing Rennie profile wins and the old one is left alone');
+  const fresh=path.join(root,'fresh');fs.mkdirSync(fresh);assert.deepEqual(start(fresh),[['userData',path.join(fresh,'Rennie')]]);
+  assert.deepEqual(start(fresh,'/qa/profile'),[],'a profile chosen before startup, as the smoke tests do, is kept');
+  const dev=path.join(root,'dev');fs.mkdirSync(path.join(dev,'Foxsocket'),{recursive:true});
+  assert.deepEqual(start(dev,path.join(dev,'Rennie'),['--foxsocket-dev']),[],'a development launch never moves the real profile');assert.ok(fs.existsSync(path.join(dev,'Foxsocket')));
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+ const pkg=require('./package.json');assert.equal(pkg.name,'foxsocket');assert.equal(pkg.build.appId,'solutions.appliedai.commandcenter','the app identity stays, so upgrades and saved settings still match');
+ assert.equal(pkg.build.productName,'Rennie');assert.equal(pkg.build.win.executableName,'Rennie');
 });

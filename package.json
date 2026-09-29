@@ -81,7 +81,7 @@
         ".ps1"
       ],
       "icon": "assets/icon.ico",
-      "executableName": "Foxsocket"
+      "executableName": "Rennie"
     },
     "nsis": {
       "oneClick": true,
