@@ -189,7 +189,7 @@ async function upgrade(oldInstaller,newInstaller){
   check('25','Old profile written to %APPDATA%\\Foxsocket',fs.existsSync(path.join(APPDATA,'Foxsocket','state.json')),`start at sign-in set: ${startup}`);
   r=await install(newInstaller);app=installed();
   check('26a','Program is now Rennie.exe and Foxsocket.exe is gone',r.ok&&app?.name==='Rennie.exe'&&!fs.existsSync(path.join(app.dir,'Foxsocket.exe')),app?`${app.name} in ${path.basename(app.dir)}; Foxsocket.exe left ${fs.existsSync(path.join(app.dir,'Foxsocket.exe'))}`:'not found',true,r.seconds);
-  c=await launch();const state=await c.invoke('state');
+  c=await launch();await sleep(3000);const state=await c.invoke('state');
   check('26b','Tasks and notes survived',state.notes==='Sandbox upgrade note'&&state.tasks?.some(t=>t.id==='sandbox-1'),`notes ${state.notes==='Sandbox upgrade note'}; task ${state.tasks?.some(t=>t.id==='sandbox-1')}`);
   check('26c','Profile moved to %APPDATA%\\Rennie, old folder gone',fs.existsSync(path.join(APPDATA,'Rennie','state.json'))&&!fs.existsSync(path.join(APPDATA,'Foxsocket')),`Rennie ${fs.existsSync(path.join(APPDATA,'Rennie'))}; Foxsocket left ${fs.existsSync(path.join(APPDATA,'Foxsocket'))}`);
   const entries=await ps("(Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue).PSObject.Properties|Where-Object{$_.Value -match 'Rennie\\.exe|Foxsocket\\.exe'}|ForEach-Object{[IO.Path]::GetFileName(($_.Value -replace '\"','').Split(' ')[0])}");
