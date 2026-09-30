@@ -18,7 +18,9 @@ const run=(exe,args,options={})=>new Promise(resolve=>execFile(exe,args,{windows
 const ps=async(script,timeout)=>(await run('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{timeout})).stdout.trim();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const APPDATA=process.env.APPDATA,LOCALAPPDATA=process.env.LOCALAPPDATA,ENGINE=path.join(LOCALAPPDATA,'Rennie','engine');
-const PORT=9223,MODEL='qwen3.5-4b';
+// Each launch gets its own debugging port. Closing the app leaves the model server and OpenClaw running (as it
+// does for a user), and a program the app started can still hold the previous launch's port.
+let PORT=9222;const MODEL='qwen3.5-4b';
 
 // ---- report ----
 const steps=[];let current='';
@@ -54,17 +56,19 @@ async function closeApp(){for(const image of ['Rennie.exe','Foxsocket.exe'])awai
 async function launch(){
   await closeApp();
   const app=installed();if(!app)throw Error('the installed app was not found');
+  PORT++;
   const start=()=>spawn(app.exe,[`--remote-debugging-port=${PORT}`],{detached:true,stdio:'ignore',windowsHide:false}).unref();
   start();let starts=1;
   for(let i=0;i<150;i++){
     // A copy that saw the old one still running quits at once; start it again (up to three times).
     if(i>0&&i%20===0&&starts<3&&await appProcesses()===0){start();starts++;}
-    try{const pages=await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();const page=pages.find(p=>p.type==='page'&&p.webSocketDebuggerUrl);
+    try{const pages=await (await fetch(`http://127.0.0.1:${PORT}/json`,{signal:AbortSignal.timeout(5000)})).json();const page=pages.find(p=>p.type==='page'&&p.webSocketDebuggerUrl);
       if(page){const c=await connect(page.webSocketDebuggerUrl);for(let j=0;j<60;j++){if(await c.evaluate("typeof desktop!=='undefined'&&document.readyState==='complete'"))return c;await sleep(1000);}}}catch{}
     await sleep(1000);
   }
-  throw Error(`the app did not open its window (started ${starts} time(s); app processes now: ${await appProcesses()}; debug port answers: ${await fetch(`http://127.0.0.1:${PORT}/json`).then(r=>r.ok).catch(()=>false)})`);
+  throw Error(`the app did not open its window (started ${starts} time(s); app processes now: ${await appProcesses()}; debug port ${PORT} answers: ${await fetch(`http://127.0.0.1:${PORT}/json`,{signal:AbortSignal.timeout(10000)}).then(r=>r.ok).catch(()=>false)}; previous port held by: ${await portOwners(PORT-1)||'nothing'})`);
 }
+const portOwners=port=>ps(`@(Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue|ForEach-Object{(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}) -join ', '`);
 async function connect(url){
   const ws=new WebSocket(url);await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=()=>reject(Error('debug connection failed'));});
   let id=0;const pending=new Map();ws.onmessage=event=>{const m=JSON.parse(event.data);if(pending.has(m.id)){pending.get(m.id)(m);pending.delete(m.id);}};
