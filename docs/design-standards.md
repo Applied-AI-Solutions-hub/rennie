@@ -12,4 +12,4 @@ The existing Applied AI mark, architectural artwork, dark surfaces, and cyan acc
 - Settings: group appearance, opening/closing, and data. Descriptions must match the saved behavior. Closing to tray remains optional.
 - Conversation: retain drafts, readable message widths, escaped formatting, clear pending state, and a disabled send button for empty input.
 
-Version 0.5.0 implements these details in finish.css and finish.js, extending the existing desktop UI. Browser previews use simulated services; the packaged application uses real IPC. Automatic service management, accounts, multi-device sync, and a complete startup service orchestrator are future work.
+Version 0.5.0 implemented these details in finish.css and finish.js; the current workspace (workspace.js, workspace.css and quiet-workspace.css) replaced those files, which were removed in 2026-09. Browser previews use simulated services; the packaged application uses real IPC. Automatic service management, accounts, multi-device sync, and a complete startup service orchestrator are future work.

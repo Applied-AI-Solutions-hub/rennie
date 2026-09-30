@@ -153,10 +153,6 @@ button.link{padding:5px 0;color:#e6e6e6}
 .device-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0}
 .device-metrics>div{background:#141414;border-radius:10px;padding:16px}
 .device-metrics strong{display:block;font-size:21px;font-weight:500;margin-top:7px}
-.lighting-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.lighting-grid label{font-size:13px}
-.lighting-controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin-top:16px}
-.lighting-controls label{font-size:13px}
 textarea.notes{min-height:190px;resize:vertical}
 .startup{position:fixed;inset:0;background:#141414;display:grid;place-content:center;gap:18px;text-align:center;z-index:100}
 .startup img{width:80px;margin:auto}
@@ -212,8 +208,7 @@ button,.bubble{overflow-wrap:anywhere}
 .device-metrics{grid-template-columns:1fr}
 .composer-note span:last-child{display:none}
 .empty-chat h2{font-size:23px}
-.suggestions{grid-template-columns:1fr}
-.lighting-grid{grid-template-columns:1fr}}
+.suggestions{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 html[data-motion=off] *{transition:none!important;animation:none!important}
 @media(max-height:800px){.sidebar{padding-top:14px}

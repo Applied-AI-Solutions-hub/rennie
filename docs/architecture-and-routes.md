@@ -12,7 +12,6 @@ Scope: public source at main commit `64da418`, reviewed 2026-09-11. This describ
 | Host management | [host-manager.js](../host-manager.js), [host-main.js](../host-main.js) | WSL inspection and supported preparation operations |
 | Setup | [setup.js](../setup.js), [starter-agent.json](../starter-agent.json) | Local setup record and clean starter manifest |
 | Release checks | [updates.js](../updates.js), [updates-main.js](../updates-main.js) | GitHub release discovery; does not install updates |
-| Optional lighting | [lighting.js](../lighting.js) | Local OpenRGB integration; hardware support must be checked per device |
 
 The desktop renderer is not a public web or remote-control API. Local IPC handlers are implementation interfaces, not network routes. Read the source modules for their current argument contracts rather than using a historical route inventory.
 
@@ -30,7 +29,7 @@ Workspace state is saved as `state.json` in Electron's `userData` directory. The
 
 The source refuses to replace unreadable saved state with empty defaults. Backup export exists; confirm the specific release's import/recovery capabilities before relying on them. A chat timeout does not prove upstream work was cancelled, so do not blindly resubmit consequential actions.
 
-Host service startup and application startup are separate. Configuring a task or observing a running service is not proof of cold-boot recovery. Optional lighting needs a separate compatible local OpenRGB server and must not be treated as a prerequisite for conversation.
+Host service startup and application startup are separate. Configuring a task or observing a running service is not proof of cold-boot recovery.
 
 ## Documentation boundary
 
