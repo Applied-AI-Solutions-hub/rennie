@@ -6,7 +6,8 @@ let built=false,downloaded=false,running=false,attempts=0,verified=0,installs=0,
 const llama=require('./llama-runtime.cjs');
 llama.detect=async()=>({gpu:{name:'NVIDIA GeForce RTX 4070',videoMemory:12288*1024**2,driver:'560.94'},totalMemory:16*1024**3});
 llama.createLlamaRuntime=()=>({kind:'llama',models:llama.MODELS,
- needs:()=>({needsBuild:!built,needsModel:!downloaded,downloadBytes:(built?0:649e6)+(downloaded?0:7206168928),modelBytes:7206168928,buildBytes:649e6,unpackedBytes:1.18e9}),
+ // Sizes follow the model asked about, like the real engine, so the screen's estimate can be checked against the choice.
+ needs:model=>{const m=llama.MODELS.find(x=>x.id===model),b=llama.BUILDS[m.build],buildBytes=b.archives.reduce((sum,a)=>sum+a.bytes,0);return {needsBuild:!built,needsModel:!downloaded,downloadBytes:(built?0:buildBytes)+(downloaded?0:m.bytes),modelBytes:m.bytes,buildBytes,unpackedBytes:b.unpackedBytes};},
  install:async(model,progress)=>{attempts++;if(!built)installs++;built=true;progress({phase:'downloading-model',message:'Downloading the model.',total:100,completed:50});await new Promise(r=>setTimeout(r,1500));if(attempts===1)throw Error('Test download interrupted');downloaded=true;},
  start:async()=>{running=true;},running:async()=>running,schedule:async()=>{scheduled++;},
  verify:async model=>{verified++;return {ok:true,model,reply:'hello from '+model};},
@@ -31,7 +32,8 @@ app.whenReady().then(async()=>{
    const $=s=>document.querySelector(s),wait=ms=>new Promise(r=>setTimeout(r,ms)),check=(v,m)=>{if(!v)throw Error(m)};
    $('[data-role=host]').click();await wait(100);check($('#local-model'),'Local model first');check(!$('#distro'),'No Ubuntu prerequisite gate');
    for(let n=0;n<40&&!$('#content').textContent.includes('we recommend Ternary Bonsai 2 27B');n++)await wait(50);check($('#content').textContent.includes('we recommend Ternary Bonsai 2 27B'),'The model is recommended from the GPU');
-   check($('#local-model').value==='bonsai-2-27b','The recommended model is preselected');check(!$('#local-custom-model'),'No Ollama model field with llama.cpp');check($('#content').textContent.includes('Download the llama.cpp engine'),'Setup steps name the engine');
+   check($('#local-model').value==='bonsai-2-27b','The recommended model is preselected');
+   for(let n=0;n<40&&!$('#content').textContent.includes('download about 7.5 GB');n++)await wait(50);check($('#content').textContent.includes('download about 7.5 GB'),'The download estimate follows the recommended model (#16), got: '+($('#content').textContent.match(/download about [0-9.]+ GB/)||['none'])[0]);check(!$('#local-custom-model'),'No Ollama model field with llama.cpp');check($('#content').textContent.includes('Download the llama.cpp engine'),'Setup steps name the engine');
    $('[data-action=prepare-local]').click();for(let n=0;n<20&&$('progress')?.value!==50;n++)await wait(50);check($('progress')?.value===50,'Real download progress');check($('[data-action=prepare-local]').disabled,'Duplicate setup blocked');await wait(1700);
    check($('#content').textContent.includes('Test download interrupted'),'Failure stays visible');
    $('[data-page=devices]').click();check($('#content').textContent.includes('Test download interrupted'),'This PC retains failure');
