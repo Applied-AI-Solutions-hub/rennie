@@ -1,5 +1,5 @@
 'use strict';
-// Runs the Lenovo acceptance steps that a machine can run, against the real installed app, in a
+// Runs the acceptance steps that a machine can run, against the real installed app, in a
 // throwaway Windows VM (GitHub Actions). It drives the app the way the setup screen does: through
 // the page's own desktop.invoke(), reached over Chromium's debugging port on this VM only.
 //
@@ -10,7 +10,7 @@
 //                                                                 moves, the data survives, Rennie.exe replaces Foxsocket.exe
 //
 // Not a clean consumer PC: Windows Server with developer tools, no real sign-in, no Smart App Control,
-// no GPU. The Lenovo run (LENOVO-START-HERE.md) stays the acceptance test; this catches regressions.
+// no GPU. The development PC (docs/testing.md) covers the GPU, a real restart and Smart App Control.
 // The report never contains keys, tokens or file contents.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {spawn,execFile}=require('node:child_process');
@@ -32,7 +32,7 @@ function writeReport(title){
   const rows=steps.map(s=>`| ${s.part} | ${s.id} | ${s.name} | ${{pass:'✅ pass',fail:'❌ FAIL',limited:'⚠️ runner limit',untested:'— untested',info:'ℹ️'}[s.status]||s.status} | ${s.seconds??''} | ${s.detail.replace(/\|/g,'\\|').replace(/\n/g,' ')} |`);
   const failed=steps.filter(s=>s.status==='fail'&&s.core);
   const md=[`## ${title}`,'',failed.length?`**${failed.length} core check(s) failed.**`:'**All core checks passed.**','',
-    'Throwaway GitHub Actions Windows VM: not a clean consumer PC, no real sign-in, no Smart App Control, no GPU. The Lenovo run stays the acceptance test.','',
+    'Throwaway GitHub Actions Windows VM: not a clean consumer PC, no real sign-in, no Smart App Control, no GPU. See docs/testing.md for what the development PC covers.','',
     '| Part | Step | Check | Result | s | Detail |','|---|---|---|---|---:|---|',...rows,''].join('\n');
   if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,md+'\n');
   fs.mkdirSync('sandbox-report',{recursive:true});
@@ -173,7 +173,7 @@ async function full(installer){
     record('18b','Sign-in task starts the server (run by hand; no real sign-in here)',up?'pass':'limited',up?'server running from the task':'the runner may not run interactive tasks',false);}
   c=await launch();r=await ask(c,'Reply with only the word blue.');
   check('19','Reply after the simulated restart',r.ok,r.ok?`"${r.text.slice(0,60)}"`:r.error,true,r.seconds);
-  record('19b','First reply after restart','info',`${r.seconds} s (Lenovo: ~230 s)`,false);
+  record('19b','First reply after restart','info',`${r.seconds} s (Lenovo CPU, 2026-09-29: ~230 s)`,false);
 
   part('E');
   await stopServer();

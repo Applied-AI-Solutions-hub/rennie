@@ -1,6 +1,6 @@
 name: Windows sandbox acceptance
 
-# The machine-runnable part of LENOVO-START-HERE.md, against the real installed app in a throwaway
+# The machine-runnable acceptance steps from docs/testing.md, against the real installed app in a throwaway
 # Windows VM. Run it from the Actions tab (Run workflow), or add the "sandbox" label to a pull
 # request. It is slow (it downloads a 2.7 GB model and installs OpenClaw), so it doesn't run on every PR.
 on:
