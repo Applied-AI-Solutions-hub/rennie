@@ -47,17 +47,23 @@ function installed(){
   return null;
 }
 // Ends the app's own processes only (no /T): the model server it started keeps running, as after a normal close.
-async function closeApp(){for(const image of ['Rennie.exe','Foxsocket.exe'])await run('taskkill.exe',['/IM',image,'/F']);await sleep(2000);}
+const appProcesses=async()=>Number(await ps("@(Get-Process -Name Rennie,Foxsocket -ErrorAction SilentlyContinue).Count"));
+// taskkill returns before the processes have exited. Rennie runs one copy at a time, so a new copy started
+// while the old one is still exiting quits at once; wait until the old one is gone.
+async function closeApp(){for(const image of ['Rennie.exe','Foxsocket.exe'])await run('taskkill.exe',['/IM',image,'/F']);for(let i=0;i<30&&await appProcesses()>0;i++)await sleep(1000);await sleep(1000);}
 async function launch(){
   await closeApp();
   const app=installed();if(!app)throw Error('the installed app was not found');
-  spawn(app.exe,[`--remote-debugging-port=${PORT}`],{detached:true,stdio:'ignore',windowsHide:false}).unref();
-  for(let i=0;i<90;i++){
+  const start=()=>spawn(app.exe,[`--remote-debugging-port=${PORT}`],{detached:true,stdio:'ignore',windowsHide:false}).unref();
+  start();let starts=1;
+  for(let i=0;i<150;i++){
+    // A copy that saw the old one still running quits at once; start it again (up to three times).
+    if(i>0&&i%20===0&&starts<3&&await appProcesses()===0){start();starts++;}
     try{const pages=await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();const page=pages.find(p=>p.type==='page'&&p.webSocketDebuggerUrl);
       if(page){const c=await connect(page.webSocketDebuggerUrl);for(let j=0;j<60;j++){if(await c.evaluate("typeof desktop!=='undefined'&&document.readyState==='complete'"))return c;await sleep(1000);}}}catch{}
     await sleep(1000);
   }
-  throw Error('the app did not open its window');
+  throw Error(`the app did not open its window (started ${starts} time(s); app processes now: ${await appProcesses()}; debug port answers: ${await fetch(`http://127.0.0.1:${PORT}/json`).then(r=>r.ok).catch(()=>false)})`);
 }
 async function connect(url){
   const ws=new WebSocket(url);await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=()=>reject(Error('debug connection failed'));});
