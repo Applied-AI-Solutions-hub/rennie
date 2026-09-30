@@ -77,9 +77,9 @@ test('download failures and interrupted sessions retain the model and last resul
  f.setFailure(null);await f.manager.prepare(DEFAULT_MODEL);assert.equal(f.manager.get().verified,true);
  const resumed=fixture({phase:'downloading-model',busy:true,model:'llama3.2:3b',error:'previous failure'});assert.equal(resumed.manager.get().phase,'interrupted');assert.equal(resumed.manager.get().model,'llama3.2:3b');assert.equal(resumed.manager.get().error,'previous failure');
 });
-test('existing setup is reverified after app restart without reinstalling or downloading',async()=>{
+test('an existing setup is rechecked after app restart without reinstalling, downloading or asking the model again',async()=>{
  const f=fixture({phase:'ready',model:DEFAULT_MODEL,verified:true});f.setOnline(true);f.setDownloaded(true);
- assert.equal(f.manager.get().verified,false);assert.equal((await f.manager.status(DEFAULT_MODEL)).ok,true);await f.manager.status(DEFAULT_MODEL);assert.deepEqual(f.calls,['verify']);
+ assert.equal(f.manager.get().verified,false);assert.equal((await f.manager.status(DEFAULT_MODEL)).ok,true);await f.manager.status(DEFAULT_MODEL);assert.deepEqual(f.calls,[],'setup already verified this model (Lenovo finding 7)');
 });
 test('a verification-only check cannot install software or download a model',async()=>{
  const f=fixture();await f.manager.verify(DEFAULT_MODEL);assert.deepEqual(f.calls,['find']);assert.equal(f.manager.get().verified,false);
@@ -208,7 +208,7 @@ test('reopening Rennie restarts the engine without downloading, scheduling or me
  const f=llamaFixture({built:true,downloaded:true,running:false,configured:true});
  const manager=f.make({phase:'ready',model:'qwen3.5-4b',engine:'llama',backbone:'openclaw'});
  const status=await manager.status('qwen3.5-4b',{agent:true});
- assert.deepEqual(f.calls,['start:qwen3.5-4b','verify:qwen3.5-4b']);assert.ok(!f.agentCalls.some(c=>c.startsWith('chat:')));
+ assert.deepEqual(f.calls,['start:qwen3.5-4b'],'the server is started, the verified model is not asked again');assert.ok(!f.agentCalls.some(c=>c.startsWith('chat:')));
  assert.equal(status.ok,true);assert.equal(status.providerId,'openclaw');
 });
 test('engine status reports a stopped server or a missing model instead of ready',async()=>{
@@ -222,4 +222,17 @@ test('a failed reply check stops setup at that step with the engine’s own expl
  const f=llamaFixture({verifyFails:'The local model is installed and running, but it answered the basic arithmetic check incorrectly.'});
  const result=await f.make().prepare('qwen3.5-4b');
  assert.equal(result.phase,'attention');assert.equal(result.failedPhase,'verifying');assert.match(result.error,/arithmetic check incorrectly/);
+});
+test('a message sent during the quiet reopen check waits for it instead of being refused',async()=>{
+ const f=llamaFixture({built:true,downloaded:true,running:false,configured:true});
+ const manager=f.make({phase:'ready',model:'qwen3.5-4b',engine:'llama',backbone:'openclaw',reply:'arithmetic: 12'});
+ let release;const gate=new Promise(resolve=>release=resolve),start=f.engine.start;f.engine.start=async model=>{await gate;return start(model);};
+ const check=manager.status('qwen3.5-4b',{agent:true});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(manager.get().busy,true);assert.equal(manager.get().quiet,true,'chat may wait for this check');
+ release();await manager.whenIdle();assert.equal(manager.get().busy,false);assert.equal(manager.get().quiet,false);
+ assert.doesNotMatch(manager.get().message,/existing OpenClaw settings/,"Rennie's own configuration is not called existing (Lenovo finding 7)");
+ assert.equal((await check).ok,true);
+ let resume;const held=new Promise(resolve=>resume=resolve);f.engine.start=async model=>{await held;return start(model);};
+ const install=f.make();install.prepare('qwen3.5-4b');await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(install.get().busy,true);assert.notEqual(install.get().quiet,true,'a real setup still blocks chat');resume();await install.whenIdle();
 });

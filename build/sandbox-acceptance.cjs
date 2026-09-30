@@ -46,7 +46,8 @@ function installed(){
   for(const dir of fs.existsSync(root)?fs.readdirSync(root):[])for(const exe of ['Rennie.exe','Foxsocket.exe']){const file=path.join(root,dir,exe);if(fs.existsSync(file))return {dir:path.join(root,dir),exe:file,name:exe};}
   return null;
 }
-async function closeApp(){for(const image of ['Rennie.exe','Foxsocket.exe'])await run('taskkill.exe',['/IM',image,'/F','/T']);await sleep(2000);}
+// Ends the app's own processes only (no /T): the model server it started keeps running, as after a normal close.
+async function closeApp(){for(const image of ['Rennie.exe','Foxsocket.exe'])await run('taskkill.exe',['/IM',image,'/F']);await sleep(2000);}
 async function launch(){
   await closeApp();
   const app=installed();if(!app)throw Error('the installed app was not found');
@@ -148,8 +149,8 @@ async function full(installer){
   await c.invoke('local-prepare',{model:MODEL});let again=await waitForSetup(c,20*60000);
   r=await ask(c,'Reply with only the word blue.');
   check('20c','Resume setup brings replies back',again.state?.phase==='ready'&&r.ok,r.ok?`ready in ${again.seconds} s; "${r.text.slice(0,40)}"`:(again.state?.error||r.error),true,again.seconds);
-  const clawCmd=path.join(APPDATA,'npm','openclaw.cmd');
-  const stopped=await run('cmd.exe',['/d','/c',clawCmd,'gateway','stop'],{timeout:120000});
+  const clawCmd=await ps("$env:Path=[Environment]::GetEnvironmentVariable('Path','User')+';'+[Environment]::GetEnvironmentVariable('Path','Machine');(Get-Command openclaw.cmd -ErrorAction SilentlyContinue).Source");
+  const stopped=clawCmd?await run('cmd.exe',['/d','/c',clawCmd,'gateway','stop'],{timeout:120000}):{ok:false,stderr:'openclaw.cmd not found on the saved PATH'};
   record('21a','openclaw.cmd gateway stop',stopped.ok?'info':'limited',stopped.ok?'stopped':(stopped.stderr||stopped.stdout).slice(0,160),false);
   r=await ask(c,'Reply with only the word blue.');
   record('21b','Gateway stopped: what Rennie says','info',r.ok?`replied anyway: "${r.text.slice(0,60)}"`:`"${String(r.error).slice(0,200)}"`,false);
@@ -175,6 +176,7 @@ async function full(installer){
   const un=uninstaller?await run(path.join(dir,uninstaller),['/S'],{timeout:600000}):{ok:false};
   await waitFor(async()=>!fs.existsSync(path.join(LOCALAPPDATA,'Rennie')),120);
   const leftTask=await taskExists(),leftServer=await serverCount(),leftEngine=fs.existsSync(path.join(LOCALAPPDATA,'Rennie')),keptClaw=fs.existsSync(path.join(os.homedir(),'.openclaw'));
+  if(leftEngine)record('23-left','Left in %LOCALAPPDATA%\\Rennie','info',await ps("Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA 'Rennie') -Recurse -Force -ErrorAction SilentlyContinue|Select-Object -First 15|ForEach-Object{$_.FullName.Substring($env:LOCALAPPDATA.Length+8)+' '+$_.Length}"),false);
   check('23','Uninstall removes task, server and engine; OpenClaw stays',un.ok&&!leftTask&&leftServer===0&&!leftEngine&&keptClaw,`task left ${leftTask}; servers left ${leftServer}; %LOCALAPPDATA%\\Rennie left ${leftEngine}; OpenClaw kept ${keptClaw}`);
 }
 
