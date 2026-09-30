@@ -27,7 +27,7 @@ Full records: [docs/engine-plan.md](docs/engine-plan.md) and [docs/openclaw-back
 
 ## Before you start
 
-1. **Get the installer.** Download the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact from the Windows validation run of the most recently merged pull request. At the time of writing that is #13 (commit `92a9c7d`, the same code as `main` at `0f3c82f`); its artifact expires on 13 October 2026. Extract it. Check that `BUILD-INFO.json` shows that commit and `"signature_status": "NotSigned"`, and that the installer's SHA-256 matches `SHA256SUMS.txt`.
+1. **Get the installer.** Download the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact from the latest Windows validation run of the pull request you're testing. For the rename (`Rennie.exe`, `%APPDATA%\Rennie` and the profile move that Part H checks), that's #15 or anything merged after it; earlier builds still use `Foxsocket.exe` and `%APPDATA%\Foxsocket`. Artifacts expire 14 days after their run. Extract it. Check that `BUILD-INFO.json` shows that pull request's latest commit as `tested_head_sha` and `"signature_status": "NotSigned"`, and that the installer's SHA-256 matches `SHA256SUMS.txt`.
 2. **Record the baseline.** Note whether each of these is present:
    - Rennie or Foxsocket (the installed app), `%APPDATA%\Rennie`, `%APPDATA%\Foxsocket` and `%LOCALAPPDATA%\Rennie`;
    - OpenClaw: `openclaw --version` in a new terminal, and `%USERPROFILE%\.openclaw`;

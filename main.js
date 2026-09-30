@@ -2,12 +2,16 @@ const {app,BrowserWindow,ipcMain,Tray,Menu,shell,dialog}=require('electron');
 const fs=require('fs'),path=require('path'),os=require('os'),crypto=require('crypto');
 // The profile lives in %APPDATA%\Rennie. A profile from before the rename (%APPDATA%\Foxsocket) is moved there once, in one
 // step, so nothing is copied twice or left half-moved. If it cannot move yet (an older copy of the app still has files open),
-// this run keeps using it and the move is tried again next time. Only the default folder is handled: tests set their own
-// before loading this file, and a development launch uses its own profile and never moves the real one.
-if(app.getPath('userData')===path.join(app.getPath('appData'),app.getName())&&!process.argv.includes('--foxsocket-dev')){
+// this run keeps using it and the move is tried again next time. Only the installed app does this: running from source
+// (pnpm start) or a development launch never moves the real profile, and tests set their own before loading this file.
+if(app.isPackaged&&app.getPath('userData')===path.join(app.getPath('appData'),app.getName())){
   const appData=app.getPath('appData'),profile=path.join(appData,'Rennie'),before=path.join(appData,'Foxsocket');
   let use=profile;
-  if(!fs.existsSync(profile)&&fs.existsSync(before)){try{fs.renameSync(before,profile);}catch{use=before;}}
+  if(!fs.existsSync(profile)&&fs.existsSync(before)){
+    // Two copies starting together after an upgrade can race here. If the old folder is gone and the new one exists, the
+    // other copy moved it, so this one uses the moved profile too; only a real failure keeps using the old folder.
+    try{fs.renameSync(before,profile);}catch{if(fs.existsSync(before)||!fs.existsSync(profile))use=before;}
+  }
   app.setPath('userData',use);
 }
 if (!app.isPackaged && process.argv.includes('--foxsocket-dev')) require('./dev-main.cjs');
