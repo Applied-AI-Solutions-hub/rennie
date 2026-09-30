@@ -120,7 +120,7 @@ Each PR: before/after screenshots at 1440 and 1000.
 
 ## Related docs
 
-- [design-standards.md](design-standards.md)
+- [design-standards.md](../design-standards.md)
 - [design-research.md](design-research.md)
-- [design-qa.md](../design-qa.md) (repo root)
-- [managed-host.md](managed-host.md)
+- [design-qa.md](design-qa.md) (repo root)
+- [managed-host.md](../managed-host.md)
