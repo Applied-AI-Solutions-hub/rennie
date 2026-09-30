@@ -16,7 +16,6 @@
     "test:ui": "node build-ui.mjs && electron workspace-smoke.cjs",
     "test:setup": "node --test setup.test.cjs && powershell -NoProfile -ExecutionPolicy Bypass -File build/host-setup.test.ps1",
     "render:maker": "node build/render-maker.cjs",
-    "update:local": "powershell -NoProfile -ExecutionPolicy Bypass -File build/update-local.ps1",
     "test:updates": "node --test updates.test.cjs",
     "test:host": "node --test host-manager.test.cjs"
   },

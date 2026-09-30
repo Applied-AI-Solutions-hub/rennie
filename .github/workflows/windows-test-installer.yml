@@ -48,6 +48,10 @@ jobs:
         run: pnpm exec electron setup-progress-smoke.cjs
       - name: Check the full setup flow through OpenClaw (stand-ins, nothing installed)
         run: pnpm exec electron local-smoke.cjs
+      - name: Check the workspace design offline
+        run: pnpm exec electron design-smoke.cjs
+      - name: Check closing during setup asks first
+        run: pnpm exec electron local-lifecycle-smoke.cjs
       - name: Check signature rejection gate
         run: ./build/verify-signature.test.ps1
       - name: Build Windows installer
@@ -87,7 +91,7 @@ jobs:
           Copy-Item docs/development.md dev-installer/DEVELOPMENT.md
       - uses: actions/upload-artifact@v4
         with:
-          name: Foxsocket-Windows-UNSIGNED-DEVELOPMENT
+          name: Rennie-Windows-UNSIGNED-DEVELOPMENT
           path: dev-installer/*
           if-no-files-found: error
           retention-days: 14

@@ -14,7 +14,7 @@ This repository starts from Foxsocket's final snapshot. The earlier history, rel
 
 **No Rennie installer has been released yet.** Installers are unsigned until the free SignPath Foundation signing is set up ([signing status](docs/windows-signing.md)), and Smart App Control blocks unsigned installers.
 
-- **Development PCs:** use the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact from the current pull request's CI run, or run `pnpm dev:fresh` from source. See [development setup and Windows policy instructions](docs/development.md) and the [tester handoff](LENOVO-START-HERE.md).
+- **Development PCs:** use the **Rennie-Windows-UNSIGNED-DEVELOPMENT** artifact from the current pull request's CI run, or run `pnpm dev:fresh` from source. See [development setup and Windows policy instructions](docs/development.md) and the [tester handoff](LENOVO-START-HERE.md).
 
 ### Installer notes
 

@@ -1,6 +1,6 @@
 # Applied AI Command Center — first-release design
 
-Status: historical design proposal, September 9, 2026. This is not a current implementation or authorization record. See the [documentation index](README.md) for current guidance.
+Status: historical design proposal, September 9, 2026. This is not a current implementation or authorization record. See the [documentation index](../README.md) for current guidance.
 
 ## Purpose
 An installed Windows application that joins daily priorities, PC status, device lighting and background work. It must operate independently of Codex and provide a reusable foundation for Applied AI Solutions.

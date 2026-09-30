@@ -1,6 +1,6 @@
 # Documentation index
 
-Reviewed 2026-09-11 against main `64da418`. The published release, current source and proposed work are separate. Public documentation must not contain a maintainer's private machine inventory or personal assistant state.
+Reviewed 2026-09-11 against main `64da418`; on 2026-09-30 historical plans and reviews moved to [archive/](archive/). The published release, current source and proposed work are separate. Public documentation must not contain a maintainer's private machine inventory or personal assistant state.
 
 ## Getting started and current source
 
@@ -16,17 +16,19 @@ Reviewed 2026-09-11 against main `64da418`. The published release, current sourc
 - [Working across PCs](../WORKING-ON-TWO-PCS.md)
 - [Design standards](design-standards.md) and [maker signature](maker-signature.md)
 
-## Plans and scoped historical evidence
+## Archive: earlier plans and checks
 
-These describe intentions or earlier checks, not a promise that the current release implements them.
+These describe intentions or earlier checks, not a promise that the current release implements them. They are kept for the record in [archive/](archive/).
 
-- [Next-build plan](next-build-plan.md)
-- [Visual-pass proposal](visual-pass.md)
-- [Design research](design-research.md)
-- [Original design proposal](original-design.md)
-- [Button and motion trial](button-and-motion-trial.md)
-- [Earlier design QA](../design-qa.md)
-- [0.6.0-alpha.1 release note](release-0.6.0-alpha.1.md) — historical; use the GitHub release page for the artifact you install.
+- [Next-build plan](archive/next-build-plan.md)
+- [Visual-pass proposal](archive/visual-pass.md)
+- [Design research](archive/design-research.md)
+- [Original design proposal](archive/original-design.md)
+- [Button and motion trial](archive/button-and-motion-trial.md)
+- [Earlier design QA](archive/design-qa.md)
+- [0.6.0-alpha.1 release note](archive/release-0.6.0-alpha.1.md) — historical; use the GitHub release page for the artifact you install.
+- [Alpha 6 test follow-up](archive/alpha6-test-followup.md)
+- [Feature review](archive/feature-review.md)
 
 ## Maintaining this index
 

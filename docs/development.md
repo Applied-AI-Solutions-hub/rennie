@@ -12,7 +12,7 @@ This is a development-machine choice. Do not present it as an installation requi
 
 ## Test the installer
 
-Download the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact from the current PR's Windows validation run. Extract it and check version, commit, signature status, and SHA256SUMS before launching. This build installs the real app and can exercise installer behavior; it is not signed or approved for protected consumer PCs.
+Download the **Rennie-Windows-UNSIGNED-DEVELOPMENT** artifact from the current PR's Windows validation run. Extract it and check version, commit, signature status, and SHA256SUMS before launching. This build installs the real app and can exercise installer behavior; it is not signed or approved for protected consumer PCs.
 
 Use a clean Foxsocket installation for each Lenovo iteration as requested. Preserve unrelated data and record remaining runtime/model caches. The previously incomplete cleanup must not be represented as a pristine Windows baseline.
 
