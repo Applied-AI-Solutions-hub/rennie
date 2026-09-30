@@ -9,6 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Continue'
 
+Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
 # Only copies started from Rennie's own folder; any other llama-server on this PC is left running.
@@ -18,8 +19,10 @@ $running = @(Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'" -Er
 foreach ($process in $running) { Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue }
 foreach ($process in $running) { Wait-Process -Id $process.ProcessId -Timeout 15 -ErrorAction SilentlyContinue }
 
-# rmdir removes a folder link itself and never follows it into another folder.
-if (Test-Path -LiteralPath $EngineRoot) {
+# rmdir removes a folder link itself and never follows it into another folder. A program that is still
+# closing can hold the folder for a moment, so the removal is tried again for up to ten seconds.
+for ($try = 0; $try -lt 10 -and (Test-Path -LiteralPath $EngineRoot); $try++) {
+    if ($try) { Start-Sleep -Seconds 1 }
     & (Join-Path $env:SystemRoot 'System32\cmd.exe') /d /c rmdir /s /q "$EngineRoot" 2>$null
 }
 $parent = Split-Path -Parent $EngineRoot

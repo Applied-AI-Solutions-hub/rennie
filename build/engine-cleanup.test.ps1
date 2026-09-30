@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 # Stand-ins: copies of ping.exe named llama-server.exe, one inside the engine
-# folder and one outside it. A folder link inside the engine folder points at a
+# folder and one outside it. A third runs inside conhost --headless from the
+# engine folder, as the sign-in task starts the real server. A folder link inside the engine folder points at a
 # folder that must survive. The sign-in task part runs only in CI, so a local
 # run never touches this PC's Task Scheduler.
 $root = Join-Path ([IO.Path]::GetTempPath()) ('rennie cleanup ' + [guid]::NewGuid())
@@ -17,6 +18,7 @@ Copy-Item -LiteralPath $ping -Destination (Join-Path $inside 'llama-server.exe')
 Copy-Item -LiteralPath $ping -Destination (Join-Path $outside 'llama-server.exe')
 $ours = Start-Process -FilePath (Join-Path $inside 'llama-server.exe') -ArgumentList '-n', '120', '127.0.0.1' -WindowStyle Hidden -PassThru
 $other = Start-Process -FilePath (Join-Path $outside 'llama-server.exe') -ArgumentList '-n', '120', '127.0.0.1' -WindowStyle Hidden -PassThru
+$wrapped = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\conhost.exe') -ArgumentList '--headless', ('"' + (Join-Path $inside 'llama-server.exe') + '"'), '-n', '120', '127.0.0.1' -WorkingDirectory $inside -WindowStyle Hidden -PassThru
 $task = 'RennieCleanupTest-' + [guid]::NewGuid()
 $ci = $env:CI -eq 'true'
 try {
@@ -25,8 +27,9 @@ try {
     }
     & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'engine-cleanup.ps1') -EngineRoot $engine -TaskName $task
     if ($LASTEXITCODE -ne 0) { throw "Cleanup exited with $LASTEXITCODE" }
-    $ours.Refresh(); $other.Refresh()
+    $ours.Refresh(); $other.Refresh(); $wrapped.Refresh()
     if (-not $ours.HasExited) { throw 'The server running from the engine folder was not stopped' }
+    if (-not $wrapped.HasExited) { throw 'The conhost running the server from the engine folder did not exit' }
     if ($other.HasExited) { throw 'A llama-server outside the engine folder was stopped' }
     if (Test-Path -LiteralPath $engine) { throw 'The engine folder was not removed' }
     if (Test-Path -LiteralPath (Join-Path $root 'Rennie')) { throw 'The empty Rennie folder was not removed' }
@@ -35,10 +38,10 @@ try {
     # Nothing to clean is not an error.
     & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'engine-cleanup.ps1') -EngineRoot $engine -TaskName $task
     if ($LASTEXITCODE -ne 0) { throw 'Cleanup failed when there was nothing to clean' }
-    Write-Output ('PASS: engine cleanup stops only its own server, removes the engine folder without following links' + $(if ($ci) { ', and removes the sign-in task.' } else { '. Sign-in task part skipped outside CI.' }))
+    Write-Output ('PASS: engine cleanup stops only its own server (also when conhost runs it, as the sign-in task does), removes the engine folder without following links' + $(if ($ci) { ', and removes the sign-in task.' } else { '. Sign-in task part skipped outside CI.' }))
 }
 finally {
-    foreach ($p in @($ours, $other)) { if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+    foreach ($p in @($ours, $other, $wrapped)) { if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
     if ($ci) { Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 300
     & (Join-Path $env:SystemRoot 'System32\cmd.exe') /d /c rmdir /s /q "$root" 2>$null

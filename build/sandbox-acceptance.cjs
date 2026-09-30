@@ -174,7 +174,7 @@ async function full(installer){
   const gw=await c.invoke('gateway').catch(e=>({error:e.message}));record('20b','Status while the server is down','info',JSON.stringify({ok:gw.ok,error:gw.error||gw.message}).slice(0,200),false);
   await c.invoke('local-prepare',{model:MODEL});let again=await waitForSetup(c,20*60000);
   r=await ask(c,'Reply with only the word blue.');
-  check('20c','Resume setup brings replies back',again.state?.phase==='ready'&&r.ok,r.ok?`ready in ${again.seconds} s; "${r.text.slice(0,40)}"`:(again.state?.error||r.error),true,again.seconds);
+  check('20c','Resume setup brings replies back',again.state?.phase==='ready'&&r.ok,`setup ended ${again.state?.phase||"unknown"}${again.state?.failedPhase?" at "+again.state.failedPhase:""} after ${again.seconds} s (phases: ${again.phases.join(" → ")})${again.state?.error?"; setup said: "+String(again.state.error).slice(0,160):""}; then ${r.ok?`replied "${r.text.slice(0,40)}"`:"no reply: "+String(r.error).slice(0,120)}`,true,again.seconds);
   const clawCmd=await ps("$env:Path=[Environment]::GetEnvironmentVariable('Path','User')+';'+[Environment]::GetEnvironmentVariable('Path','Machine');(Get-Command openclaw.cmd -ErrorAction SilentlyContinue).Source");
   const stopped=clawCmd?await run('cmd.exe',['/d','/c',clawCmd,'gateway','stop'],{timeout:120000}):{ok:false,stderr:'openclaw.cmd not found on the saved PATH'};
   record('21a','openclaw.cmd gateway stop',stopped.ok?'info':'limited',stopped.ok?'stopped':(stopped.stderr||stopped.stdout).slice(0,160),false);
@@ -198,10 +198,14 @@ async function full(installer){
 
   part('G');
   await closeApp();c.close();
+  const uninstallStarted=Date.now();
   const dir=installed()?.dir,uninstaller=dir&&fs.readdirSync(dir).find(f=>/^Uninstall .*\.exe$/i.test(f));
   const un=uninstaller?await run(path.join(dir,uninstaller),['/S'],{timeout:600000}):{ok:false};
   await waitFor(async()=>!fs.existsSync(path.join(LOCALAPPDATA,'Rennie')),120);
   const leftTask=await taskExists(),leftServer=await serverCount(),leftEngine=fs.existsSync(path.join(LOCALAPPDATA,'Rennie')),keptClaw=fs.existsSync(path.join(os.homedir(),'.openclaw'));
+  if(leftEngine)record('23-using','Programs still running from %LOCALAPPDATA%\\Rennie','info',await ps("@(Get-CimInstance Win32_Process|Where-Object{\"$($_.ExecutablePath) $($_.CommandLine)\" -like ('*'+(Join-Path $env:LOCALAPPDATA 'Rennie')+'*')}|ForEach-Object{$_.Name}) -join ', '")||'none',false);
+  if(leftEngine){const made=fs.statSync(path.join(LOCALAPPDATA,'Rennie','engine')).birthtimeMs;let removal='removed now';try{fs.rmdirSync(path.join(LOCALAPPDATA,'Rennie','engine'));fs.rmdirSync(path.join(LOCALAPPDATA,'Rennie'));}catch(error){removal=error.code||error.message;}
+    record('23-when','The folder left behind','info',`made ${made>=uninstallStarted?'after':'before'} the uninstall started; removing it now: ${removal}`,false);}
   if(leftEngine)record('23-left','Left in %LOCALAPPDATA%\\Rennie','info',await ps("Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA 'Rennie') -Recurse -Force -ErrorAction SilentlyContinue|Select-Object -First 15|ForEach-Object{$_.FullName.Substring($env:LOCALAPPDATA.Length+8)+' '+$_.Length}"),false);
   check('23','Uninstall removes task, server and engine; OpenClaw stays',un.ok&&!leftTask&&leftServer===0&&!leftEngine&&keptClaw,`task left ${leftTask}; servers left ${leftServer}; %LOCALAPPDATA%\\Rennie left ${leftEngine}; OpenClaw kept ${keptClaw}`);
 }
