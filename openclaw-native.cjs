@@ -176,6 +176,10 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     return gateway.pending||(gateway.pending=cli(['gateway','status','--json','--require-rpc','--timeout','10000'],{timeout:60000}).then(r=>(gateway={at:Date.now(),up:r.code===0,pending:null}).up,error=>{gateway.pending=null;throw error;}));
   }
   const forgetGateway=()=>{gateway={...gateway,at:-Infinity};};
+  // Onboarding starts the gateway while it is still saving the connector and its key; a gateway that loaded
+  // its settings too early answers with HTTP 401. OpenClaw's plugin guide also asks for a restart after adding a
+  // plugin. So after Rennie sets OpenClaw up, the gateway is restarted once. Best effort: startGateway() follows.
+  async function restartGateway(){await cli(['gateway','restart'],{timeout:180000}).catch(()=>null);forgetGateway();}
   async function startGateway(){
     if(await gatewayRunning({fresh:true}))return;
     let r=await cli(['gateway','start'],{timeout:120000});
@@ -210,6 +214,6 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     const r=await cli(['doctor','--fix','--non-interactive'],{timeout:10*60*1000});forgetGateway();
     return {ok:r.code===0,report:await doctor().catch(()=>null)};
   }
-  return {locate,install,configured,onboard,setName,agents,gatewayRunning,startGateway,chat,doctor,repair,log:()=>[...lastLog]};
+  return {locate,install,configured,onboard,setName,agents,gatewayRunning,restartGateway,startGateway,chat,doctor,repair,log:()=>[...lastLog]};
 }
 module.exports={createOpenClaw,runProcess,parseAgents,VERSION,INSTALL_SCRIPT};

@@ -90,6 +90,11 @@ async function ask(c,text){
 const serverCount=()=>ps(`$d=Join-Path $env:LOCALAPPDATA 'Rennie\\engine';@(Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'"|Where-Object{$_.ExecutablePath -like "$d\\*"}).Count`).then(Number);
 const stopServer=()=>ps(`$d=Join-Path $env:LOCALAPPDATA 'Rennie\\engine';Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'"|Where-Object{$_.ExecutablePath -like "$d\\*"}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force;Wait-Process -Id $_.ProcessId -Timeout 15 -ErrorAction SilentlyContinue}`);
 const taskExists=async()=>(await run('schtasks.exe',['/Query','/TN','Rennie model server'])).ok;
+// The newest OpenClaw log file's last lines. Long hex strings and anything after key/token/secret/password are blanked.
+async function openclawLogTail(){
+  const out=await ps("$f=Get-ChildItem -LiteralPath (Join-Path $env:USERPROFILE '.openclaw') -Recurse -File -Include *.log,*.jsonl -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 1;if($f){$f.Name;Get-Content -LiteralPath $f.FullName -Tail 12}");
+  return out.replace(/[0-9a-f]{32,}/gi,'<hex>').replace(/((?:api[_-]?key|token|secret|password|authorization)["'\s:=]+(?:bearer\s+)?)[^\s"',}]+/gi,'$1<blanked>').replace(/\r?\n/g,' / ').slice(0,390);
+}
 async function waitFor(fn,seconds){for(let i=0;i<seconds;i++){if(await fn())return true;await sleep(1000);}return false;}
 
 // ---- full: clean install to uninstall ----
@@ -108,7 +113,7 @@ async function full(installer){
   await c.invoke('local-prepare',{model:MODEL,agentName:'Sandbox'});
   const setup=await waitForSetup(c,70*60000);
   check('7-9','Setup reaches ready',setup.state?.phase==='ready',setup.state?.phase==='ready'?`phases: ${setup.phases.join(' → ')}; first reply "${String(setup.state.reply||'').slice(0,80)}"`:`stopped at ${setup.state?.failedPhase||setup.state?.phase}: ${setup.state?.error||'timeout'}`,true,setup.seconds);
-  if(setup.state?.phase!=='ready'){record('A-log','Setup log (last lines)','info',(setup.state?.log||[]).slice(-8).join(' / '),false);return;}
+  if(setup.state?.phase!=='ready'){record('A-log','Setup log (last lines)','info',(setup.state?.log||[]).slice(-8).join(' / '),false);record('A-openclaw','OpenClaw log (last lines, secrets blanked)','info',await openclawLogTail(),false);return;}
   check('7b','Engine is llama.cpp',setup.state.engine==='llama',setup.state.engine);
   record('8','Interrupted download','untested','not simulated in the sandbox',false);
 

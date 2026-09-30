@@ -106,6 +106,11 @@ test('onboarding to Rennie’s llama.cpp server adds the pinned connector and pa
  const failed=fake(layout(),{'plugins install':{code:1,stdout:'',stderr:'npm error network'}});
  await assert.rejects(failed.claw.onboard({model:'x',target}),/could not add its llama\.cpp connector/);assert.ok(!failed.cliCalls().some(c=>c.args[1]==='onboard'));
 });
+test('after setup the gateway is restarted, so it loads the connector and the saved key',async()=>{
+ const l=layout();const f=fake(l);await f.claw.restartGateway();
+ assert.deepEqual(f.cliCalls().map(c=>c.args.slice(1).join(' ')),['gateway restart']);
+ const failing=fake(layout(),{'gateway restart':{code:1,stdout:'',stderr:'no service'}});await failing.claw.restartGateway();
+});
 test('an existing OpenClaw configuration is reused and never re-onboarded',async()=>{
  const l=layout({configured:true});const f=fake(l);
  assert.deepEqual(await f.claw.onboard({model:'llama3.2:3b'}),{reused:true});assert.equal(f.cliCalls().length,0);

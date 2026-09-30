@@ -129,6 +129,8 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
     else if(!reused)throw Error('OpenClaw is not set up yet. Choose Resume setup.');
     let nameNote=null;
     if(install&&agentName&&!reused){try{await openclaw.setName(agentName);}catch(error){nameNote=error.message;}}
+    // A configuration Rennie just created is loaded by a fresh gateway, so its saved key is used (HTTP 401 otherwise).
+    if(install&&!reused)await openclaw.restartGateway?.();
     set({phase:'starting-openclaw',message:'Starting the OpenClaw gateway in the background.'});
     await openclaw.startGateway();
     const list=await openclaw.agents();

@@ -116,7 +116,7 @@ function agentFixture({installed=false,configured=false,reply='The answer is 12.
   configured:()=>state.configured,
   onboard:async({model})=>{calls.push('onboard:'+model);if(state.configured)return {reused:true};state.configured=true;return {reused:false};},
   setName:async name=>calls.push('name:'+name),
-  startGateway:async()=>calls.push('gateway'),gatewayRunning:async()=>true,
+  restartGateway:async()=>calls.push('restart'),startGateway:async()=>calls.push('gateway'),gatewayRunning:async()=>true,
   agents:async()=>[{id:'main',name:'Pip'}],
   chat:async({session})=>{calls.push('chat:'+session);return {content:reply,model:replyModel};},
  };
@@ -127,7 +127,7 @@ function agentFixture({installed=false,configured=false,reply='The answer is 12.
 test('fresh setup installs OpenClaw, configures it, names the assistant and confirms a reply through OpenClaw',async()=>{
  const f=agentFixture();const phases=[];const manager=f.make();
  const result=await manager.prepare(DEFAULT_MODEL,{agentName:'Pip'});
- assert.deepEqual(f.calls,['locate','install','onboard:'+DEFAULT_MODEL,'name:Pip','gateway','chat:agent:main:foxsocket-setup-check']);
+ assert.deepEqual(f.calls,['locate','install','onboard:'+DEFAULT_MODEL,'name:Pip','restart','gateway','chat:agent:main:foxsocket-setup-check']);
  assert.equal(result.phase,'ready');assert.equal(result.backbone,'openclaw');assert.equal(result.agentId,'main');assert.equal(result.agentName,'Pip');
  assert.equal(f.ready.length,1,'the app is told to route chat through OpenClaw');assert.match(result.message,/runs on OpenClaw/);
 });
