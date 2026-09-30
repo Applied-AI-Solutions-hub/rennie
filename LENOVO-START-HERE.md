@@ -16,7 +16,7 @@ This test does not cover signing (criterion 1) or the NVIDIA half of criterion 2
 
 Rennie was previously Foxsocket; this is the first build series from this repository.
 
-- **One-click installer.** It asks no questions, installs for the current user without an administrator prompt, and opens the app. The installer file is `Rennie-Setup-0.7.0-alpha.1.exe` (no spaces), matching SHA256SUMS.txt. The program file is still `Foxsocket.exe`, and the profile folder is still `%APPDATA%\Foxsocket`.
+- **One-click installer.** It asks no questions, installs for the current user without an administrator prompt, and opens the app. The installer file is `Rennie-Setup-0.7.0-alpha.1.exe` (no spaces), matching SHA256SUMS.txt. The program is `Rennie.exe` and the profile folder is `%APPDATA%\Rennie`. A profile from an earlier Foxsocket install (`%APPDATA%\Foxsocket`) is moved there automatically the first time Rennie starts. Builds up to commit `3ad8c05` still used `Foxsocket.exe` and `%APPDATA%\Foxsocket`; if you're testing one of those, the old names are expected.
 - **New model engine (llama.cpp).** On a PC without an NVIDIA GPU, which includes this Lenovo, Rennie downloads the processor build of PrismML's llama.cpp (about 19 MB) and Qwen3.5 4B (about 2.7 GB). Both are pinned and checked against published checksums. They live in `%LOCALAPPDATA%\Rennie\engine`.
 - **Model server.** It listens on this PC only (`127.0.0.1:18080`) and needs a per-install key, which it reads from a file, so the key never appears in a process list. It starts at sign-in through a Task Scheduler task named **Rennie model server**, with no window.
 - **OpenClaw is the assistant.** Rennie installs OpenClaw 2026.9.3 natively on Windows (no Ubuntu/WSL), adds OpenClaw's llama.cpp connector, points it at the model server, and confirms a first reply through OpenClaw. Chat then goes through OpenClaw.
@@ -27,16 +27,16 @@ Full records: [docs/engine-plan.md](docs/engine-plan.md) and [docs/openclaw-back
 
 ## Before you start
 
-1. **Get the installer.** Download the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact from the Windows validation run of the most recently merged pull request. At the time of writing that is #13 (commit `92a9c7d`, the same code as `main` at `0f3c82f`); its artifact expires on 13 October 2026. Extract it. Check that `BUILD-INFO.json` shows that commit and `"signature_status": "NotSigned"`, and that the installer's SHA-256 matches `SHA256SUMS.txt`.
+1. **Get the installer.** Download the **Foxsocket-Windows-UNSIGNED-DEVELOPMENT** artifact from the latest Windows validation run of the pull request you're testing. For the rename (`Rennie.exe`, `%APPDATA%\Rennie` and the profile move that Part H checks), that's #15 or anything merged after it; earlier builds still use `Foxsocket.exe` and `%APPDATA%\Foxsocket`. Artifacts expire 14 days after their run. Extract it. Check that `BUILD-INFO.json` shows that pull request's latest commit as `tested_head_sha` and `"signature_status": "NotSigned"`, and that the installer's SHA-256 matches `SHA256SUMS.txt`.
 2. **Record the baseline.** Note whether each of these is present:
-   - Rennie or Foxsocket (the installed app), `%APPDATA%\Foxsocket` and `%LOCALAPPDATA%\Rennie`;
+   - Rennie or Foxsocket (the installed app), `%APPDATA%\Rennie`, `%APPDATA%\Foxsocket` and `%LOCALAPPDATA%\Rennie`;
    - OpenClaw: `openclaw --version` in a new terminal, and `%USERPROFILE%\.openclaw`;
    - Node.js (`node --version`), Ollama, and a **Rennie model server** task in Task Scheduler.
 
    A partially cleaned PC is not "clean"; say what was left.
 3. **Make the PC clean without losing anything.** The clean pass needs no earlier Rennie setup and no OpenClaw at all. An existing OpenClaw configuration is kept and keeps its own model; an installed OpenClaw is reused, which skips OpenClaw's installer; and a finished Ollama setup keeps Ollama. So:
    - Uninstall any earlier Rennie or Foxsocket. Keep its installer if you have it, for Part H.
-   - Rename `%APPDATA%\Foxsocket` to `Foxsocket.before-acceptance` and `%USERPROFILE%\.openclaw` to `.openclaw.before-acceptance`. **Don't delete them.**
+   - Rename `%APPDATA%\Rennie` and `%APPDATA%\Foxsocket` (whichever exist) to `Rennie.before-acceptance` and `Foxsocket.before-acceptance`, and `%USERPROFILE%\.openclaw` to `.openclaw.before-acceptance`. **Don't delete them.**
    - If `openclaw --version` works, remove the OpenClaw program with `npm uninstall -g openclaw` and record it. If you'd rather keep it, go on, but report the OpenClaw installation in step 9 as **untested**. Then the CPU half of criterion 2 is only partly shown.
    - Node.js may stay. If it's present, report the Node.js permission prompt in step 9 as not applicable.
    - Leave Ollama installed if it's there; this build doesn't use it.
@@ -171,6 +171,9 @@ Criterion 3 asks that upgrading from the previous alpha keeps the user's profile
       - One install folder: record it before and after, and whether the old one is removed.
       - One set of Start menu and desktop shortcuts.
       - The app opens with the tasks, notes and conversation from step 25 still there.
+      - The profile is now in `%APPDATA%\Rennie`, and `%APPDATA%\Foxsocket` is gone: it was moved, not copied.
+      - The program is `Rennie.exe`, and `Foxsocket.exe` is gone from the install folder.
+      - If "start when I sign in" was on in the old alpha, it still starts Rennie after the next sign-in.
       - The assistant name is kept.
 27. **Set up the assistant from there** (steps 6–11).
     - *Expected:* the same results as the clean pass. OpenClaw's existing configuration from Part A is reused, and its model stays `llama-cpp/qwen3.5-4b`.

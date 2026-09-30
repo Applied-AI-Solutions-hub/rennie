@@ -13,7 +13,7 @@ const DOWNLOAD_REASONS={
  stalled:'The Ollama download stopped receiving data and did not recover after several automatic retries. Check the internet connection, then choose Resume setup; the download continues where it stopped.',
  network:'The connection dropped during the Ollama download and did not recover after several automatic retries. Choose Resume setup when you are back online; the download continues where it stopped.',
  server:'The Ollama download server is busy or unavailable. Wait a few minutes, then choose Resume setup.',
- http:'The Ollama download link was refused by the server. Update Foxsocket or try again later.',
+ http:'The Ollama download link was refused by the server. Update Rennie or try again later.',
  size:'The Ollama download was larger than expected, so it was not used. Try again later.',
  incomplete:'The Ollama download ended early. Choose Resume setup; the download continues where it stopped.',
  restart:'The saved Ollama download no longer matched the server and was discarded. Choose Resume setup to download it again.',
@@ -39,7 +39,7 @@ function createWindowsRuntime({directory,api,fetchImpl=fetch,env=process.env,exe
       fs.rmSync(target,{force:true});
       throw Error('The Ollama installer signature could not be verified, so it was deleted without running. Check that the Windows date and time are correct, then retry.');
     }
-    progress({phase:'installing-runtime',message:'Installing Ollama for your Windows account. If its welcome window opens, return to Foxsocket; no action there is required.',total:null,completed:0});
+    progress({phase:'installing-runtime',message:'Installing Ollama for your Windows account. If its welcome window opens, return to Rennie; no action there is required.',total:null,completed:0});
     try{await executeImpl(target,['/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-'],{windowsHide:true,timeout:1800000});}catch{throw Error('Ollama installation did not finish. Check any Windows prompt, then retry.');}
     if(!await find())throw Error('Ollama was not found after installation. Retry setup.');
     // The installer is about 1.5 GB and is not needed once Ollama is installed.

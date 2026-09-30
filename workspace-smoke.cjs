@@ -18,7 +18,7 @@ app.whenReady().then(async()=>{
    const $=s=>document.querySelector(s),wait=ms=>new Promise(r=>setTimeout(r,ms)),check=(v,m)=>{if(!v)throw Error(m)};
    check(document.body.dataset.page==='setup','Fresh install must open setup');
    $('[data-role=host]').click();await wait(100);check($('#local-model'),'Fresh PC offers local models');check($('#content').textContent.includes('No API key is required'),'Local model needs no cloud key');
-   $('[data-action=legacy-host]').click();await wait(100);check($('#content').textContent.includes('None found'),'Optional Linux requirements');check($('#content').textContent.includes('Let Foxsocket prepare Ubuntu'),'Missing Linux guidance');
+   $('[data-action=legacy-host]').click();await wait(100);check($('#content').textContent.includes('None found'),'Optional Linux requirements');check($('#content').textContent.includes('Let Rennie prepare Ubuntu'),'Missing Linux guidance');
    $('[data-host=install-linux]').click();await wait(100);check(!$('[data-host=install-linux]').disabled,'Ubuntu setup can be reopened after postponing');
    const saved=await desktop.invoke('state');check(saved.setup.role==='host','Host choice persists');
    $('[data-page=settings]').click();$('[data-action=help]').click();await wait(60);check($('#help').open&&$('#help-text').textContent.includes('beginner walkthrough'),'Offline setup help');$('#close-help').click();
