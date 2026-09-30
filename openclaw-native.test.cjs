@@ -49,6 +49,17 @@ test('chat text travels in a file, never on the command line, and the file is re
  assert.equal(fs.existsSync(seen.file),false);
  await assert.rejects(f.claw.chat({message:'x',session:'main; rm -rf'}),/invalid session/);
 });
+test('cold local replies get fifteen minutes and the process deadline leaves shutdown grace',async()=>{
+ const l=layout();const f=fake(l,{'agent --session-key':{code:0,stdout:'{"ok":true,"status":"ok","final":"blue"}'}});
+ for(const timeoutSeconds of [undefined,30]){
+  await f.claw.chat({message:'Reply with only the word blue.',session:'agent:main:cold-test',...(timeoutSeconds===undefined?{}:{timeoutSeconds})});
+  const call=f.cliCalls().at(-1),seconds=timeoutSeconds??900;
+  assert.equal(call.args[call.args.indexOf('--timeout')+1],String(seconds));
+  assert.equal(call.options.timeout,(seconds+60)*1000);
+  assert.equal(fs.readdirSync(path.join(l.root,'work','messages')).length,0);
+ }
+});
+
 test('real OpenClaw 2026.9.3 replies are read, via the gateway and with --local (captured 2026-09-28, ids scrubbed)',async()=>{
  const l=layout();
  const meta={durationMs:12724,agentMeta:{sessionId:'00000000-0000-0000-0000-000000000000',provider:'llama-cpp',model:'bonsai-8b',contextTokens:32768,usage:{input:16377,output:10,cacheRead:7570}}};
@@ -60,6 +71,16 @@ test('real OpenClaw 2026.9.3 replies are read, via the gateway and with --local 
  }
  const failed=fake(l,{'agent --session-key':{code:1,stdout:JSON.stringify({runId:'r',status:'error',summary:'failed',result:{payloads:[],meta}})}});
  await assert.rejects(failed.claw.chat({message:'x',session:'agent:main:x'}),/could not complete the reply/);
+});
+test('a reply refused with HTTP 401 is tried again once, then the error is shown',async()=>{
+ const l=layout();const refused={code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'Authentication failed (provider returned HTTP 401). Your provider token may have expired.'}})};
+ let answers=[refused,{code:0,stdout:'{"ok":true,"status":"ok","final":"blue"}'}];const f=fake(l,{'agent --session-key':()=>answers.shift()});
+ assert.equal((await f.claw.chat({message:'x',session:'agent:main:x'})).content,'blue');
+ assert.equal(f.cliCalls().filter(c=>c.args.includes('--session-key')).length,2);assert.ok(f.claw.log().some(line=>/HTTP 401/.test(line)),'the retry is noted in the setup log');
+ answers=[refused,refused];const g=fake(l,{'agent --session-key':()=>answers.shift()});
+ await assert.rejects(g.claw.chat({message:'x',session:'agent:main:x'}),/HTTP 401/);assert.equal(g.cliCalls().filter(c=>c.args.includes('--session-key')).length,2,'only one retry');
+ const other=fake(l,{'agent --session-key':{code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'model not found'}})}});
+ await assert.rejects(other.claw.chat({message:'x',session:'agent:main:x'}),/model not found/);assert.equal(other.cliCalls().filter(c=>c.args.includes('--session-key')).length,1,'other errors are not retried');
 });
 test('agent failures surface OpenClaw’s own explanation instead of a generic error',async()=>{
  const l=layout();
@@ -94,6 +115,11 @@ test('onboarding to Rennie’s llama.cpp server adds the pinned connector and pa
  for(const bad of [{...target,baseUrl:'http://192.0.2.1:18080/v1'},{...target,apiKey:'short'},{...target,modelId:'a b'},{...target,thinking:'max'}])await assert.rejects(fake(layout()).claw.onboard({model:'x',target:bad}),/not valid/);
  const failed=fake(layout(),{'plugins install':{code:1,stdout:'',stderr:'npm error network'}});
  await assert.rejects(failed.claw.onboard({model:'x',target}),/could not add its llama\.cpp connector/);assert.ok(!failed.cliCalls().some(c=>c.args[1]==='onboard'));
+});
+test('after setup the gateway is restarted, so it loads the connector and the saved key',async()=>{
+ const l=layout();const f=fake(l);await f.claw.restartGateway();
+ assert.deepEqual(f.cliCalls().map(c=>c.args.slice(1).join(' ')),['gateway restart']);
+ const failing=fake(layout(),{'gateway restart':{code:1,stdout:'',stderr:'no service'}});await failing.claw.restartGateway();
 });
 test('an existing OpenClaw configuration is reused and never re-onboarded',async()=>{
  const l=layout({configured:true});const f=fake(l);
