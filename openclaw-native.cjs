@@ -197,12 +197,19 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     fs.mkdirSync(path.join(directory,'messages'),{recursive:true});
     const file=path.join(directory,'messages',crypto.randomUUID()+'.txt');
     fs.writeFileSync(file,message,{encoding:'utf8',mode:0o600});
-    try{
+    const ask=async()=>{
       const r=await cli(['agent','--session-key',session,'--message-file',file,'--json','--timeout',String(timeoutSeconds)],{timeout:(timeoutSeconds+60)*1000});
       let result;try{result=json(r.stdout);}catch{throw Error(r.timedOut?'Your assistant did not reply in time.':'OpenClaw did not return a reply. Check that its gateway is running in This PC.');}
       const reply=readAgentReply(result);
       if(!reply.ok)throw Error(reply.status==='timeout'?'Your assistant did not reply in time. The first reply after starting can take several minutes on the processor. Check This PC, then try again.':String(reply.error||'OpenClaw could not complete the reply.').slice(0,300));
       return {content:reply.text,model:reply.model,provider:reply.provider};
+    };
+    try{
+      // Sandbox runs (2026-09-30): about half the time OpenClaw's first request after it starts reached the
+      // llama.cpp server without the key it had saved (HTTP 401), while a later request worked. OpenClaw's own
+      // message says to try again in a moment, so a 401 is retried once after a short wait.
+      try{return await ask();}
+      catch(error){if(!/HTTP 401/.test(error.message))throw error;keep(lastLog,'OpenClaw returned HTTP 401; trying the reply again once.',80);await wait(15000);return await ask();}
     }catch(error){forgetGateway();throw error;}finally{fs.rmSync(file,{force:true});}
   }
   async function doctor(){

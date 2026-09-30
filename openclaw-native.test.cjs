@@ -72,6 +72,16 @@ test('real OpenClaw 2026.9.3 replies are read, via the gateway and with --local 
  const failed=fake(l,{'agent --session-key':{code:1,stdout:JSON.stringify({runId:'r',status:'error',summary:'failed',result:{payloads:[],meta}})}});
  await assert.rejects(failed.claw.chat({message:'x',session:'agent:main:x'}),/could not complete the reply/);
 });
+test('a reply refused with HTTP 401 is tried again once, then the error is shown',async()=>{
+ const l=layout();const refused={code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'Authentication failed (provider returned HTTP 401). Your provider token may have expired.'}})};
+ let answers=[refused,{code:0,stdout:'{"ok":true,"status":"ok","final":"blue"}'}];const f=fake(l,{'agent --session-key':()=>answers.shift()});
+ assert.equal((await f.claw.chat({message:'x',session:'agent:main:x'})).content,'blue');
+ assert.equal(f.cliCalls().filter(c=>c.args.includes('--session-key')).length,2);assert.ok(f.claw.log().some(line=>/HTTP 401/.test(line)),'the retry is noted in the setup log');
+ answers=[refused,refused];const g=fake(l,{'agent --session-key':()=>answers.shift()});
+ await assert.rejects(g.claw.chat({message:'x',session:'agent:main:x'}),/HTTP 401/);assert.equal(g.cliCalls().filter(c=>c.args.includes('--session-key')).length,2,'only one retry');
+ const other=fake(l,{'agent --session-key':{code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'model not found'}})}});
+ await assert.rejects(other.claw.chat({message:'x',session:'agent:main:x'}),/model not found/);assert.equal(other.cliCalls().filter(c=>c.args.includes('--session-key')).length,1,'other errors are not retried');
+});
 test('agent failures surface OpenClaw’s own explanation instead of a generic error',async()=>{
  const l=layout();
  const f=fake(l,{'agent --session-key':{code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'model llama3.2:3b not found',kind:'model'}})}});
