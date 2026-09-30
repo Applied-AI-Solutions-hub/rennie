@@ -49,6 +49,17 @@ test('chat text travels in a file, never on the command line, and the file is re
  assert.equal(fs.existsSync(seen.file),false);
  await assert.rejects(f.claw.chat({message:'x',session:'main; rm -rf'}),/invalid session/);
 });
+test('cold local replies get fifteen minutes and the process deadline leaves shutdown grace',async()=>{
+ const l=layout();const f=fake(l,{'agent --session-key':{code:0,stdout:'{"ok":true,"status":"ok","final":"blue"}'}});
+ for(const timeoutSeconds of [undefined,30]){
+  await f.claw.chat({message:'Reply with only the word blue.',session:'agent:main:cold-test',...(timeoutSeconds===undefined?{}:{timeoutSeconds})});
+  const call=f.cliCalls().at(-1),seconds=timeoutSeconds??900;
+  assert.equal(call.args[call.args.indexOf('--timeout')+1],String(seconds));
+  assert.equal(call.options.timeout,(seconds+60)*1000);
+  assert.equal(fs.readdirSync(path.join(l.root,'work','messages')).length,0);
+ }
+});
+
 test('real OpenClaw 2026.9.3 replies are read, via the gateway and with --local (captured 2026-09-28, ids scrubbed)',async()=>{
  const l=layout();
  const meta={durationMs:12724,agentMeta:{sessionId:'00000000-0000-0000-0000-000000000000',provider:'llama-cpp',model:'bonsai-8b',contextTokens:32768,usage:{input:16377,output:10,cacheRead:7570}}};

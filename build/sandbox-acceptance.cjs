@@ -81,7 +81,8 @@ async function waitForSetup(c,timeoutMs){
   return {state:last,phases,seconds:Math.round((Date.now()-began)/1000)};
 }
 async function ask(c,text){
-  const [result,seconds]=await timed(async()=>{try{const state=await c.invoke('chat',text,15*60000);const last=state.chat.at(-1);return {ok:last?.role==='assistant',text:String(last?.text||''),provider:last?.provider};}catch(error){return {ok:false,error:error.message};}});
+  // Leave room beyond OpenClaw's 15-minute reply budget and its CLI shutdown grace.
+  const [result,seconds]=await timed(async()=>{try{const state=await c.invoke('chat',text,17*60000);const last=state.chat.at(-1);return {ok:last?.role==='assistant',text:String(last?.text||''),provider:last?.provider};}catch(error){return {ok:false,error:error.message};}});
   return {...result,seconds};
 }
 // Rennie's own server only: llama-server.exe running from its engine folder.

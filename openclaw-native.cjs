@@ -184,7 +184,10 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     for(let i=0;i<30;i++){if(await gatewayRunning({fresh:true}))return;await wait(2000);}
     throw Error('The OpenClaw gateway did not start. Choose Run OpenClaw doctor to see why, or restart Windows and choose Resume setup.');
   }
-  async function chat({message,session,timeoutSeconds=300}){
+  // A cold CPU model can spend more than five minutes reading OpenClaw's
+  // initial prompt. Apply the same bounded budget to setup and later chats:
+  // the first request after a Windows restart is cold too.
+  async function chat({message,session,timeoutSeconds=900}){
     if(typeof message!=='string'||!message.trim())throw Error('Enter a message.');
     if(!SESSION.test(String(session)))throw Error('This conversation has an invalid session. Start a new chat.');
     fs.mkdirSync(path.join(directory,'messages'),{recursive:true});
@@ -194,7 +197,7 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
       const r=await cli(['agent','--session-key',session,'--message-file',file,'--json','--timeout',String(timeoutSeconds)],{timeout:(timeoutSeconds+60)*1000});
       let result;try{result=json(r.stdout);}catch{throw Error(r.timedOut?'Your assistant did not reply in time.':'OpenClaw did not return a reply. Check that its gateway is running in This PC.');}
       const reply=readAgentReply(result);
-      if(!reply.ok)throw Error(reply.status==='timeout'?'Your assistant did not reply in time. Try a shorter request.':String(reply.error||'OpenClaw could not complete the reply.').slice(0,300));
+      if(!reply.ok)throw Error(reply.status==='timeout'?'Your assistant did not reply in time. The first reply after starting can take several minutes on the processor. Check This PC, then try again.':String(reply.error||'OpenClaw could not complete the reply.').slice(0,300));
       return {content:reply.text,model:reply.model,provider:reply.provider};
     }catch(error){forgetGateway();throw error;}finally{fs.rmSync(file,{force:true});}
   }
