@@ -67,7 +67,8 @@
       "download.cjs",
       "preflight.cjs",
       "openclaw-native.cjs",
-      "llama-runtime.cjs"
+      "llama-runtime.cjs",
+      "login-item.cjs"
     ],
     "win": {
       "target": "nsis",

@@ -176,6 +176,10 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     return gateway.pending||(gateway.pending=cli(['gateway','status','--json','--require-rpc','--timeout','10000'],{timeout:60000}).then(r=>(gateway={at:Date.now(),up:r.code===0,pending:null}).up,error=>{gateway.pending=null;throw error;}));
   }
   const forgetGateway=()=>{gateway={...gateway,at:-Infinity};};
+  // Onboarding starts the gateway while it is still saving the connector and its key; a gateway that loaded
+  // its settings too early answers with HTTP 401. OpenClaw's plugin guide also asks for a restart after adding a
+  // plugin. So after Rennie sets OpenClaw up, the gateway is restarted once. Best effort: startGateway() follows.
+  async function restartGateway(){await cli(['gateway','restart'],{timeout:180000}).catch(()=>null);forgetGateway();}
   async function startGateway(){
     if(await gatewayRunning({fresh:true}))return;
     let r=await cli(['gateway','start'],{timeout:120000});
@@ -184,18 +188,28 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     for(let i=0;i<30;i++){if(await gatewayRunning({fresh:true}))return;await wait(2000);}
     throw Error('The OpenClaw gateway did not start. Choose Run OpenClaw doctor to see why, or restart Windows and choose Resume setup.');
   }
-  async function chat({message,session,timeoutSeconds=300}){
+  // A cold CPU model can spend more than five minutes reading OpenClaw's
+  // initial prompt. Apply the same bounded budget to setup and later chats:
+  // the first request after a Windows restart is cold too.
+  async function chat({message,session,timeoutSeconds=900}){
     if(typeof message!=='string'||!message.trim())throw Error('Enter a message.');
     if(!SESSION.test(String(session)))throw Error('This conversation has an invalid session. Start a new chat.');
     fs.mkdirSync(path.join(directory,'messages'),{recursive:true});
     const file=path.join(directory,'messages',crypto.randomUUID()+'.txt');
     fs.writeFileSync(file,message,{encoding:'utf8',mode:0o600});
-    try{
+    const ask=async()=>{
       const r=await cli(['agent','--session-key',session,'--message-file',file,'--json','--timeout',String(timeoutSeconds)],{timeout:(timeoutSeconds+60)*1000});
       let result;try{result=json(r.stdout);}catch{throw Error(r.timedOut?'Your assistant did not reply in time.':'OpenClaw did not return a reply. Check that its gateway is running in This PC.');}
       const reply=readAgentReply(result);
-      if(!reply.ok)throw Error(reply.status==='timeout'?'Your assistant did not reply in time. Try a shorter request.':String(reply.error||'OpenClaw could not complete the reply.').slice(0,300));
+      if(!reply.ok)throw Error(reply.status==='timeout'?'Your assistant did not reply in time. The first reply after starting can take several minutes on the processor. Check This PC, then try again.':String(reply.error||'OpenClaw could not complete the reply.').slice(0,300));
       return {content:reply.text,model:reply.model,provider:reply.provider};
+    };
+    try{
+      // Sandbox runs (2026-09-30): about half the time OpenClaw's first request after it starts reached the
+      // llama.cpp server without the key it had saved (HTTP 401), while a later request worked. OpenClaw's own
+      // message says to try again in a moment, so a 401 is retried once after a short wait.
+      try{return await ask();}
+      catch(error){if(!/HTTP 401/.test(error.message))throw error;keep(lastLog,'OpenClaw returned HTTP 401; trying the reply again once.',80);await wait(15000);return await ask();}
     }catch(error){forgetGateway();throw error;}finally{fs.rmSync(file,{force:true});}
   }
   async function doctor(){
@@ -207,6 +221,6 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     const r=await cli(['doctor','--fix','--non-interactive'],{timeout:10*60*1000});forgetGateway();
     return {ok:r.code===0,report:await doctor().catch(()=>null)};
   }
-  return {locate,install,configured,onboard,setName,agents,gatewayRunning,startGateway,chat,doctor,repair,log:()=>[...lastLog]};
+  return {locate,install,configured,onboard,setName,agents,gatewayRunning,restartGateway,startGateway,chat,doctor,repair,log:()=>[...lastLog]};
 }
 module.exports={createOpenClaw,runProcess,parseAgents,VERSION,INSTALL_SCRIPT};

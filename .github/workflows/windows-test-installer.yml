@@ -30,7 +30,7 @@ jobs:
         run: node node_modules/electron/install.js
       - name: Check Host setup
         run: |
-          node --test build/windows-signing.test.cjs host-manager.test.cjs setup.test.cjs updates.test.cjs local-model.test.cjs local-runtime.test.cjs local-chat.test.cjs download.test.cjs preflight.test.cjs openclaw-native.test.cjs branding.test.cjs package.test.cjs build-ui.test.cjs llama-runtime.test.cjs
+          node --test build/windows-signing.test.cjs host-manager.test.cjs setup.test.cjs updates.test.cjs local-model.test.cjs local-runtime.test.cjs local-chat.test.cjs download.test.cjs preflight.test.cjs openclaw-native.test.cjs branding.test.cjs package.test.cjs build-ui.test.cjs llama-runtime.test.cjs login-item.test.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell -NoProfile -ExecutionPolicy Bypass -File build/host-setup.test.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

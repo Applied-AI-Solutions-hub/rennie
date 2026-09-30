@@ -1,5 +1,11 @@
 # Lenovo acceptance test — Rennie 0.7.0-alpha.1
 
+## Current build follow-up (2026-09-29, PR #19)
+
+The sandbox reached the first OpenClaw reply on a CPU runner but hit the old five-minute reply limit. PR #19 now allows fifteen minutes for an OpenClaw reply (including chat after a restart), with an extra minute for the CLI to finish. Setup and chat explain that the first reply on the processor can take several minutes. The sandbox waits longer than the application deadline so it can record the application's result.
+
+Local validation: 114 unit tests passed. A new real sandbox run is still required; the longer timeout is not yet proof that the full acceptance procedure passes. The existing sign-in-entry migration fix also needs the upgrade job to complete. Background OpenClaw prompt warm-up, repeated direct checks on reopen, and a real Windows restart remain follow-up work. Do not credit those from this change.
+
 This is the acceptance test for issue #5 on a PC with no NVIDIA GPU. Each beta criterion ([docs/beta-criteria.md](docs/beta-criteria.md)) is credited only when the parts listed for it have been run and passed. If a part is skipped, report its criterion as untested.
 
 | Criterion | Credited when these pass |

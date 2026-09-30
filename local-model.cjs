@@ -129,6 +129,8 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
     else if(!reused)throw Error('OpenClaw is not set up yet. Choose Resume setup.');
     let nameNote=null;
     if(install&&agentName&&!reused){try{await openclaw.setName(agentName);}catch(error){nameNote=error.message;}}
+    // A configuration Rennie just created is loaded by a fresh gateway, so its saved key is used (HTTP 401 otherwise).
+    if(install&&!reused)await openclaw.restartGateway?.();
     set({phase:'starting-openclaw',message:'Starting the OpenClaw gateway in the background.'});
     await openclaw.startGateway();
     const list=await openclaw.agents();
@@ -136,7 +138,7 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
     if(!agent)throw Error('OpenClaw has no agent configured. Choose Run OpenClaw doctor to see why.');
     // Reopening Foxsocket only checks the gateway, so it never adds messages to your agent.
     if(!probe)return {agent,reused};
-    set({phase:'verifying-openclaw',message:'Asking your assistant for a reply through OpenClaw. The first reply can take a few minutes.'});
+    set({phase:'verifying-openclaw',message:'Your assistant is waking up. OpenClaw is preparing its first reply; on the processor this can take several minutes. Please keep Rennie open. We allow up to 15 minutes for this reply.'});
     const check=require('./local-chat.cjs').CHECKS[0];
     const reply=await openclaw.chat({message:check.prompt,session:`agent:${agent.id}:${SETUP_SESSION}`});
     // The model OpenClaw actually answered with. An existing OpenClaw setup keeps its own model.
@@ -149,7 +151,7 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
     if(engine&&!engine.models.some(m=>m.id===model))throw Error('Choose one of the listed local models.');
     if(job)return job;
     job=Promise.resolve().then(async()=>{
-      verifiedModel=null;set({busy:true,phase:'checking',model,agentName,verified:false,error:null,reply:null,total:null,completed:0,message:'Checking this PC.'});
+      verifiedModel=null;set({busy:true,quiet:!install&&!probe,phase:'checking',model,agentName,verified:false,error:null,reply:null,total:null,completed:0,message:'Checking this PC.'});
       try {
         if(install)await checkBeforeDownloading(model);
         let startNote=null;
@@ -176,20 +178,22 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
           await api.pull(model,update=>set({phase:'downloading-model',...update},true));
         }
         set({phase:'verifying',message:'Asking the selected model for a real reply. The first load can take a few minutes.',total:null,completed:0});
-        const result=engine?await engine.verify(model):await api.verify(model);
+        // Reopening Rennie doesn't ask the model its questions again: setup already verified this exact model.
+        const trusted=!install&&!probe&&saved?.phase==='ready'&&saved.model===model;
+        const result=trusted?{reply:saved.reply}:engine?await engine.verify(model):await api.verify(model);
         let agent=null;
         if(openclaw&&viaAgent)agent=await prepareAgent(model,{install,probe,agentName});
         verifiedModel=model;
         // Report the model OpenClaw really uses: a kept configuration may not use the one selected here.
         const used=agent?(agent.agentModel||(agent.reused?state.agentModel:model)||null):null;
-        const kept=agent?.reused?(used&&normalized(used)!==normalized(model)?` Your existing OpenClaw setup was kept, so it uses ${used} rather than ${model}. Change the model in OpenClaw to switch.`:' Your existing OpenClaw settings were kept.'):'';
+        const kept=agent?.reused&&install?(used&&normalized(used)!==normalized(model)?` Your existing OpenClaw setup was kept, so it uses ${used} rather than ${model}. Change the model in OpenClaw to switch.`:' Your existing OpenClaw settings were kept.'):'';
         const quality=agent&&agent.agentCheck===false?' Your assistant replied, but its answer to a basic check was off; small local models can give unreliable answers.':'';
         const message=agent?`Ready. Your assistant runs on OpenClaw${used?' with '+used:''} on this PC.${kept}${quality}`:'Connected. Basic arithmetic and instruction checks passed; answer quality can still vary.';
-        const done=set({phase:'ready',busy:false,verified:true,message,reply:agent?.agentReply||result.reply,error:null,backbone:agent?'openclaw':engine?'llama':'ollama',engine:engine?engine.kind:'ollama',agentId:agent?.agent.id||null,agentDisplayName:agent?.agent.name||null,agentModel:used,note:[agent?.nameNote,startNote].filter(Boolean).join(' ')||null});
+        const done=set({phase:'ready',busy:false,quiet:false,verified:true,message,reply:agent?.agentReply||result.reply,error:null,backbone:agent?'openclaw':engine?'llama':'ollama',engine:engine?engine.kind:'ollama',agentId:agent?.agent.id||null,agentDisplayName:agent?.agent.name||null,agentModel:used,note:[agent?.nameNote,startNote].filter(Boolean).join(' ')||null});
         // Only an OpenClaw-verified setup moves chat to OpenClaw; the direct local route never does.
         if(agent)onReady(done);
         return done;
-      } catch(error){verifiedModel=null;return set({phase:'attention',failedPhase:state.phase,busy:false,verified:false,error:error.message,message:'Setup needs attention. Retry to continue.'});}
+      } catch(error){verifiedModel=null;return set({phase:'attention',failedPhase:state.phase,busy:false,quiet:false,verified:false,error:error.message,message:'Setup needs attention. Retry to continue.'});}
     }).finally(()=>job=null);return job;
   }
   // `agent`: the caller routes chat through OpenClaw, so its gateway must be up too.
@@ -210,6 +214,6 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
     }catch(error){verifiedModel=null;return {ok:false,providerId:'local',model,error:error.message};}
   }
   // An explicit connection test sends a real message through OpenClaw when chat goes there.
-  return {prepare,verify:(model,{agent=true}={})=>prepare(model,{install:false,agent,probe:true}),status,needs,get:()=>({...state}),invalidate:()=>{verifiedModel=null;},models:engine?engine.models:MODELS};
+  return {prepare,verify:(model,{agent=true}={})=>prepare(model,{install:false,agent,probe:true}),status,needs,get:()=>({...state}),whenIdle:()=>job||Promise.resolve(),invalidate:()=>{verifiedModel=null;},models:engine?engine.models:MODELS};
 }
 module.exports={createLocalApi,createLocalSetup,MODELS,DEFAULT_MODEL,validateModel};
