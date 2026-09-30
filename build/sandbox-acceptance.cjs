@@ -96,10 +96,21 @@ async function ask(c,text){
 const serverCount=()=>ps(`$d=Join-Path $env:LOCALAPPDATA 'Rennie\\engine';@(Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'"|Where-Object{$_.ExecutablePath -like "$d\\*"}).Count`).then(Number);
 const stopServer=()=>ps(`$d=Join-Path $env:LOCALAPPDATA 'Rennie\\engine';Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'"|Where-Object{$_.ExecutablePath -like "$d\\*"}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force;Wait-Process -Id $_.ProcessId -Timeout 15 -ErrorAction SilentlyContinue}`);
 const taskExists=async()=>(await run('schtasks.exe',['/Query','/TN','Rennie model server'])).ok;
-// The newest OpenClaw log file's last lines. Long hex strings and anything after key/token/secret/password are blanked.
-async function openclawLogTail(){
-  const out=await ps("$f=Get-ChildItem -LiteralPath (Join-Path $env:USERPROFILE '.openclaw') -Recurse -File -Include *.log,*.jsonl -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 1;if($f){$f.Name;Get-Content -LiteralPath $f.FullName -Tail 12}");
-  return out.replace(/[0-9a-f]{32,}/gi,'<hex>').replace(/((?:api[_-]?key|token|secret|password|authorization)["'\s:=]+(?:bearer\s+)?)[^\s"',}]+/gi,'$1<blanked>').replace(/\r?\n/g,' / ').slice(0,390);
+// Evidence for a setup that stops at OpenClaw's first reply. Never records a key: only yes/no, counts,
+// statuses, and log lines with long hex strings and anything after key/token/secret/password blanked.
+const blankSecrets=text=>String(text).replace(/[0-9a-f]{32,}/gi,'<hex>').replace(/((?:api[_-]?key|token|secret|password|authorization)["'\s:=]+(?:bearer\s+)?)[^\s"',}]+/gi,'$1<blanked>');
+async function openclawEvidence(){
+  const out=[];let key='';try{key=fs.readFileSync(path.join(ENGINE,'server-key.txt'),'utf8').trim();}catch{}
+  out.push('server accepts the install key: '+(key?await fetch('http://127.0.0.1:18080/v1/models',{headers:{authorization:'Bearer '+key}}).then(r=>r.status).catch(()=>'no answer'):'no key file'));
+  let stored=false;const state=path.join(os.homedir(),'.openclaw','state');
+  try{for(const f of fs.readdirSync(state))if(key&&fs.readFileSync(path.join(state,f)).includes(key))stored=true;}catch{}
+  out.push('OpenClaw state holds that key: '+stored);
+  const claw=await ps("$env:Path=[Environment]::GetEnvironmentVariable('Path','User')+';'+[Environment]::GetEnvironmentVariable('Path','Machine');(Get-Command openclaw.cmd -ErrorAction SilentlyContinue).Source");
+  if(claw){const st=await run('cmd.exe',['/d','/c',claw,'gateway','status','--json'],{timeout:120000});out.push('gateway status: '+blankSecrets((st.stdout||st.stderr).replace(/\s+/g,' ')).slice(0,300));}
+  out.push('OpenClaw processes: '+blankSecrets(await ps("@(Get-CimInstance Win32_Process -Filter \"Name='node.exe'\"|Where-Object{$_.CommandLine -match 'openclaw'}|ForEach-Object{($_.CommandLine -split '\\s+'|Select-Object -Last 3) -join ' '}) -join ' | '")).slice(0,300));
+  const log=await ps("$f=Get-ChildItem -Path (Join-Path $env:USERPROFILE '.openclaw\\logs\\*') -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 1;if($f){$f.Name;Get-Content -LiteralPath $f.FullName -Tail 15}");
+  out.push('log: '+blankSecrets(log).replace(/\r?\n/g,' / ').slice(0,700));
+  return out;
 }
 async function waitFor(fn,seconds){for(let i=0;i<seconds;i++){if(await fn())return true;await sleep(1000);}return false;}
 
@@ -119,7 +130,7 @@ async function full(installer){
   await c.invoke('local-prepare',{model:MODEL,agentName:'Sandbox'});
   const setup=await waitForSetup(c,70*60000);
   check('7-9','Setup reaches ready',setup.state?.phase==='ready',setup.state?.phase==='ready'?`phases: ${setup.phases.join(' → ')}; first reply "${String(setup.state.reply||'').slice(0,80)}"`:`stopped at ${setup.state?.failedPhase||setup.state?.phase}: ${setup.state?.error||'timeout'}`,true,setup.seconds);
-  if(setup.state?.phase!=='ready'){record('A-log','Setup log (last lines)','info',(setup.state?.log||[]).slice(-8).join(' / '),false);record('A-openclaw','OpenClaw log (last lines, secrets blanked)','info',await openclawLogTail(),false);return;}
+  if(setup.state?.phase!=='ready'){record('A-log','Setup log (last lines)','info',(setup.state?.log||[]).slice(-8).join(' / '),false);for(const [i,line] of (await openclawEvidence()).entries())record('A-openclaw-'+(i+1),'OpenClaw evidence','info',line,false);return;}
   check('7b','Engine is llama.cpp',setup.state.engine==='llama',setup.state.engine);
   record('8','Interrupted download','untested','not simulated in the sandbox',false);
 
