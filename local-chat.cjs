@@ -1,7 +1,7 @@
 'use strict';
 // Local chat deliberately does not inject starter identities or model-authored
 // graph memories. Existing files stay on disk; they are not trusted user facts.
-const SYSTEM = 'You are a helpful assistant in Foxsocket. Answer the user\'s latest request directly and accurately. Follow their requested format. Do not invent personal details, device information, memories, or actions you have taken.';
+const SYSTEM = 'You are a helpful assistant in Rennie. Answer the user\'s latest request directly and accurately. Follow their requested format. Do not invent personal details, device information, memories, or actions you have taken.';
 function messages(history) {
   return [{role:'system',content:SYSTEM}, ...history.filter(m=>m.role==='user'||m.role==='assistant').slice(-24).map(m=>({role:m.role,content:String(m.content??m.text??'')}))];
 }

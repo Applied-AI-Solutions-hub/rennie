@@ -89,7 +89,7 @@ See [Contributing](CONTRIBUTING.md) and [Host implementation status](docs/manage
 
 Original code is [MIT](LICENSE). See [third-party notices](THIRD-PARTY-NOTICES.md).
 
-Existing package and application identifiers stay stable for profile compatibility, so some internal names still refer to Applied AI Command Center.
+The program is `Rennie.exe` and the profile is `%APPDATA%\Rennie`. A profile from Foxsocket is moved there automatically the first time Rennie starts. The package name and app ID stay the same so upgrades and saved settings still match, so some internal names still refer to Foxsocket or Applied AI Command Center.
 
 ## Documentation
 
