@@ -1,0 +1,86 @@
+name: Windows sandbox acceptance
+
+# The machine-runnable part of LENOVO-START-HERE.md, against the real installed app in a throwaway
+# Windows VM. Run it from the Actions tab (Run workflow), or add the "sandbox" label to a pull
+# request. It is slow (it downloads a 2.7 GB model and installs OpenClaw), so it doesn't run on every PR.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-sandbox-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-install:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'sandbox')
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@11.19.0
+      - run: pnpm install --frozen-lockfile
+      - run: node node_modules/electron/install.js
+      - name: Build the unsigned installer
+        run: pnpm dist:dev
+      - name: Clean install to uninstall
+        shell: pwsh
+        run: |
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $installer = 'release/' + $package.build.win.artifactName.Replace('${version}', $package.version).Replace('${ext}', 'exe')
+          node build/sandbox-acceptance.cjs full (Resolve-Path $installer)
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sandbox-report-clean-install
+          path: sandbox-report/*
+          if-no-files-found: warn
+
+  upgrade:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'sandbox')
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      # The last build before the rename (Foxsocket.exe, %APPDATA%\Foxsocket).
+      - uses: actions/checkout@v4
+        with:
+          ref: 3ad8c05
+          path: previous
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@11.19.0
+      - name: Build both installers
+        shell: pwsh
+        run: |
+          foreach ($dir in 'previous', '.') {
+            Push-Location $dir
+            pnpm install --frozen-lockfile; if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            node node_modules/electron/install.js; if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            pnpm dist:dev; if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            Pop-Location
+          }
+      - name: Upgrade from the pre-rename build
+        shell: pwsh
+        run: |
+          $old = Get-ChildItem previous/release -Filter 'Rennie-Setup-*.exe' | Select-Object -First 1
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $new = 'release/' + $package.build.win.artifactName.Replace('${version}', $package.version).Replace('${ext}', 'exe')
+          node build/sandbox-acceptance.cjs upgrade $old.FullName (Resolve-Path $new)
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sandbox-report-upgrade
+          path: sandbox-report/*
+          if-no-files-found: warn
