@@ -193,7 +193,7 @@ async function upgrade(oldInstaller,newInstaller){
   check('26b','Tasks and notes survived',state.notes==='Sandbox upgrade note'&&state.tasks?.some(t=>t.id==='sandbox-1'),`notes ${state.notes==='Sandbox upgrade note'}; task ${state.tasks?.some(t=>t.id==='sandbox-1')}`);
   check('26c','Profile moved to %APPDATA%\\Rennie, old folder gone',fs.existsSync(path.join(APPDATA,'Rennie','state.json'))&&!fs.existsSync(path.join(APPDATA,'Foxsocket')),`Rennie ${fs.existsSync(path.join(APPDATA,'Rennie'))}; Foxsocket left ${fs.existsSync(path.join(APPDATA,'Foxsocket'))}`);
   const entries=await ps("(Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue).PSObject.Properties|Where-Object{$_.Value -match 'Rennie\\.exe|Foxsocket\\.exe'}|ForEach-Object{[IO.Path]::GetFileName(($_.Value -replace '\"','').Split(' ')[0])}");
-  check('26d','"Start at sign-in" now points at Rennie.exe',/Rennie\.exe/i.test(entries)&&!/Foxsocket\.exe/i.test(entries),entries||'no entry',false);
+  check('26d','"Start at sign-in" now points at Rennie.exe',/Rennie\.exe/i.test(entries)&&!/Foxsocket\.exe/i.test(entries),entries||'no entry');
   await closeApp();c.close();
 }
 

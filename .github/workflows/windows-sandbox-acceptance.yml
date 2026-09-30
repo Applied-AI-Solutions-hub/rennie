@@ -54,7 +54,8 @@ jobs:
       # The last build before the rename (Foxsocket.exe, %APPDATA%\Foxsocket).
       - uses: actions/checkout@v4
         with:
-          ref: 3ad8c05
+          # Full commit id: checkout cannot fetch an abbreviated one.
+          ref: 3ad8c05da44d6fcc017316d11989d15d3ab727f2
           path: previous
       - uses: actions/setup-node@v4
         with:
