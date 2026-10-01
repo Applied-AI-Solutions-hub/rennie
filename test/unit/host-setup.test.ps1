@@ -4,6 +4,18 @@ function Assert($Condition, [string]$Message) { if (!$Condition) { throw $Messag
 $errors = $null; $tokens = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot '..\..\build\host-setup.ps1'), [ref]$tokens, [ref]$errors)
 Assert ($errors.Count -eq 0) 'Setup helper must parse in Windows PowerShell.'
+# Persisted identifiers are an upgrade contract with already-saved resume scripts.
+# Execute only the directory assignment with a synthetic root, never the helper.
+$directoryAssignment = $ast.Find({ param($n) $n -is [Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$setupDir' }, $true)
+$savedLocalAppData = $env:LOCALAPPDATA
+try {
+    $env:LOCALAPPDATA = 'C:\Rennie upgrade fixture'
+    Invoke-Expression $directoryAssignment.Extent.Text
+    Assert ($setupDir -eq 'C:\Rennie upgrade fixture\Foxsocket\HostSetup') 'Upgrade must read the progress directory used by the old resume helper.'
+} finally { $env:LOCALAPPDATA = $savedLocalAppData }
+$helperSource = $ast.Extent.Text
+Assert ($helperSource.Contains("'Local\FoxsocketHostSetup-'")) 'Old and new helpers must share the per-user mutex.'
+Assert ($helperSource.Contains("New-ItemProperty -Path `$runKey -Name 'FoxsocketHostSetup'")) 'Resume must replace the existing Run value rather than add a second launcher.'
 # Load functions only. Never run the UI, registry writes, WSL or elevation.
 foreach ($name in @('Start-HostSetup', 'Require-Success', 'Request-Restart')) {
     $node = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name }, $true)

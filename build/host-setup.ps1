@@ -17,9 +17,11 @@ Add-Type -AssemblyName System.Drawing
 # Keep distro registration in the installing user's account. Elevate only the
 # fixed, system-wide WSL installation command, never this script or saved state.
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$mutex = New-Object Threading.Mutex($false, ('Local\RennieHostSetup-' + $identity.User.Value))
+# These persisted identifiers also belong to pre-rename resume scripts. Keep them
+# stable so an upgrade resumes the same progress and cannot run two helpers.
+$mutex = New-Object Threading.Mutex($false, ('Local\FoxsocketHostSetup-' + $identity.User.Value))
 if (!$mutex.WaitOne(0)) { exit 0 }
-$setupDir = Join-Path $env:LOCALAPPDATA 'Rennie\HostSetup'
+$setupDir = Join-Path $env:LOCALAPPDATA 'Foxsocket\HostSetup'
 $stateFile = Join-Path $setupDir 'progress.json'
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $powerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -51,7 +53,7 @@ function Set-Resume([bool]$Enabled) {
         }
         $command = Get-HostSetupResumeCommand $powerShell (Join-Path $setupDir 'host-setup.ps1') $AppPath
         if (!(Test-Path $runKey)) { New-Item -Path $runKey -Force | Out-Null }
-        New-ItemProperty -Path $runKey -Name 'RennieHostSetup' -Value $command -PropertyType String -Force | Out-Null
+        New-ItemProperty -Path $runKey -Name 'FoxsocketHostSetup' -Value $command -PropertyType String -Force | Out-Null
     } else { Remove-ItemProperty -Path $runKey -Name 'RennieHostSetup', 'FoxsocketHostSetup' -ErrorAction SilentlyContinue }
 }
 function Get-Distros {

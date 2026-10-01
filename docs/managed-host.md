@@ -50,7 +50,7 @@ Startup is configured after Windows sign-in, not before login. The PC must be aw
 
 Run `node --test test/unit/host-manager.test.cjs test/unit/setup.test.cjs test/unit/updates.test.cjs`, `pnpm test:ui`, `pnpm exec electron test/smoke/host-smoke.cjs`, and `pnpm exec electron test/smoke/updates-smoke.cjs`. Host UI checks cover progress, retry, existing agent selection, honest Tailscale status, and 1440/1000/760 pixel widths.
 
-Run `powershell -NoProfile -ExecutionPolicy Bypass -File build/host-setup.test.ps1` for isolated prerequisite orchestration tests. These mock Windows servicing and WSL; they do not replace a fresh Windows VM test covering real UAC, download, reboot/sign-in recovery, default Linux user and systemd. The installer must also be built with `pnpm dist` to validate the NSIS hooks and bundled helper files.
+Run `powershell -NoProfile -ExecutionPolicy Bypass -File test/unit/host-setup.test.ps1` for isolated prerequisite orchestration tests. These mock Windows servicing and WSL; they do not replace a fresh Windows VM test covering real UAC, download, reboot/sign-in recovery, default Linux user and systemd. The installer must also be built with `pnpm dist` to validate the NSIS hooks and bundled helper files.
 
 Background Windows startup recovery and actual reboot behavior have not passed end-to-end validation. A stopped task was observed during development; this remains a release limitation.
 
