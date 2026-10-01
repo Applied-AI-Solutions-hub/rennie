@@ -6,7 +6,7 @@ Alpha.6's matching installer was NotSigned and Windows Application Control block
 
 ## Chosen route: SignPath Foundation
 
-[SignPath Foundation](https://signpath.org/) offers free signing for qualifying open-source projects. Foxsocket has an MIT license and an existing public release, making it a candidate; eligibility has not been confirmed, and no application has been submitted.
+[SignPath Foundation](https://signpath.org/) offers free signing for qualifying open-source projects. Rennie has an MIT license and an existing public release, making it a candidate; eligibility has not been confirmed, and no application has been submitted.
 
 The [program requirements](https://signpath.org/terms.html) require review before integration:
 - Confirm all components qualify, repository ownership, contributor MFA, and the project's verifiable reputation.
@@ -21,13 +21,13 @@ Start from the Apply link on the Foundation website. Account setup, terms accept
 
 Development continues independently: use `pnpm dev:fresh` or `pnpm dist:dev`. The owner has selected the Lenovo as a development PC. See [development setup](development.md).
 
-- PR CI compiles with explicit FOXSOCKET_UNSIGNED_VALIDATION=1 and publishes a clearly labelled UNSIGNED-DEVELOPMENT artifact for owner-configured development PCs.
+- PR CI compiles with explicit RENNIE_UNSIGNED_VALIDATION=1 and publishes a clearly labelled UNSIGNED-DEVELOPMENT artifact for owner-configured development PCs.
 - The trusted-distribution command `pnpm dist` fails with a pending-free-signing message. The explicit `pnpm dist:dev` command works without signing. Old Azure environment settings cannot silently activate a paid provider.
 - The manual Windows signed installer workflow is a status-only failure until the free integration is approved and implemented. It contains no signing credentials or upload step.
 - Signature verification scripts and the NSIS embedded-uninstaller check remain available for the future integration; they do not mean an installer has been signed.
 - After enrollment, integrate the approved SignPath artifact policy and protected release approval, preserve upstream signatures, check each executable against its expected signer, and hash the final signed installer. Record version, commit, signatures, and hashes in BUILD-INFO.json.
 
-If SignPath is unavailable, investigate free Microsoft Store MSIX distribution and compatibility with Foxsocket's backend setup before considering any paid alternative. There is no automatic paid fallback.
+If SignPath is unavailable, investigate free Microsoft Store MSIX distribution and compatibility with Rennie's backend setup before considering any paid alternative. There is no automatic paid fallback.
 
 ## Acceptance still required
 

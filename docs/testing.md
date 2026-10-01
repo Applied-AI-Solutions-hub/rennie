@@ -5,7 +5,7 @@ Rennie is tested in three layers. Each layer covers what the one before it can't
 | Layer | When it runs | What it covers | What it can't show |
 |---|---|---|---|
 | **PR checks** (`windows-test-installer.yml`) | Every pull request | Unit tests, app smoke tests with stand-ins, the unsigned development installer | Anything that needs a real model, OpenClaw or an installed app |
-| **Sandbox** (`windows-sandbox-acceptance.yml`) | A pull request with the `sandbox` label, or started by hand from the Actions tab | The real installed app on a throwaway Windows VM: install, processor setup through OpenClaw, chat, privacy checks, reopen, recovery, reinstall, uninstall, and an upgrade from the pre-rename Foxsocket build | A GPU, a real Windows sign-in or restart, Smart App Control, a consumer PC |
+| **Sandbox** (`windows-sandbox-acceptance.yml`) | A pull request with the `sandbox` label, or started by hand from the Actions tab | The real installed app on a throwaway Windows VM: install, processor setup through OpenClaw, chat, privacy checks, reopen, recovery, reinstall, uninstall, and an upgrade from the build before the rename | A GPU, a real Windows sign-in or restart, Smart App Control, a consumer PC |
 | **Development PC** (below) | Before a merge that changes setup, the engine or the installer | The NVIDIA path, a real restart, Smart App Control, and an upgrade of a real installed copy | A clean consumer PC with no earlier setup |
 
 The Lenovo is no longer part of testing (owner decision, 2026-09-30). Its procedure is kept in [archive/LENOVO-START-HERE.md](archive/LENOVO-START-HERE.md).
@@ -72,6 +72,6 @@ Use a separate Git checkout per machine or agent, fetch before starting, and sub
 
 - **Signing:** the SignPath Foundation application (#3). Until then, protected consumer PCs may block the installer.
 - **Processor path on real hardware:** only the sandbox VM covers it now.
-- **First reply on the processor:** 10–14 minutes on the sandbox VM's 4 cores. A warm-up at sign-in is planned.
+- **First reply on the processor:** sandbox run 36806197972 passed setup and upgrade but exceeded the 17-minute test deadline after a simulated restart. Its subsequent repair failure happened while the earlier request could still be running, so it needs an independent rerun. Authentication retries now share the original 15-minute reply budget, and the sandbox stops if its own deadline expires rather than starting repair against an unresolved request. These changes bound the wait; they do not establish a latency improvement. A warm-up at sign-in is planned.
 - **OpenClaw background jobs:** OpenClaw runs its own heartbeat every 30 minutes, which can wake the model.
 - **Ollama:** kept only for installs already set up on it; removal is planned.

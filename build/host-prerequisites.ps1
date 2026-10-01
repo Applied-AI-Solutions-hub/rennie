@@ -41,11 +41,13 @@ function Get-HostSetupLinuxScript {
     # Only used for a distro created by this setup. No password or broad sudo grant.
     return @'
 set -eu
-if ! id foxsocket >/dev/null 2>&1; then
-    useradd --create-home --shell /bin/bash foxsocket
+account=rennie
+if id foxsocket >/dev/null 2>&1; then account=foxsocket; fi
+if ! id "$account" >/dev/null 2>&1; then
+    useradd --create-home --shell /bin/bash "$account"
 fi
-test "$(id -u foxsocket)" != 0
-python3 - <<'PY'
+test "$(id -u "$account")" != 0
+ACCOUNT="$account" python3 - <<'PY'
 import configparser, os
 p = '/etc/wsl.conf'
 c = configparser.ConfigParser()
@@ -53,9 +55,9 @@ c.read(p)
 for section in ('boot', 'user'):
     if not c.has_section(section): c.add_section(section)
 c.set('boot', 'systemd', 'true')
-c.set('user', 'default', 'foxsocket')
-with open(p + '.foxsocket.tmp', 'w') as f: c.write(f)
-os.replace(p + '.foxsocket.tmp', p)
+c.set('user', 'default', os.environ['ACCOUNT'])
+with open(p + '.rennie.tmp', 'w') as f: c.write(f)
+os.replace(p + '.rennie.tmp', p)
 PY
 '@
 }

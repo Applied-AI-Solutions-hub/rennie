@@ -1,4 +1,4 @@
-const brand=require('./branding');
+const brand=require('./src/branding');
 // These presentation values may change. appId and package name remain stable.
 const build=require('./package.json').build;
 const signing=require('./build/windows-signing.cjs');

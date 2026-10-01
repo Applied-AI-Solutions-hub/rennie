@@ -1,6 +1,6 @@
 ; A registry path alone is not evidence of an existing installation.
 ; Only remove stale registration for this app identity; never remove user data.
-!macro FoxsocketPruneStaleLocation root
+!macro RenniePruneStaleLocation root
   ReadRegStr $0 ${root} "${INSTALL_REGISTRY_KEY}" "InstallLocation"
   ${If} $0 != ""
     ${IfNot} ${FileExists} "$0\Rennie.exe"
@@ -17,10 +17,10 @@
 !macro preInit
   !ifndef BUILD_UNINSTALLER
     SetRegView 64
-    !insertmacro FoxsocketPruneStaleLocation HKCU
-    !insertmacro FoxsocketPruneStaleLocation HKLM
+    !insertmacro RenniePruneStaleLocation HKCU
+    !insertmacro RenniePruneStaleLocation HKLM
     SetRegView 32
-    !insertmacro FoxsocketPruneStaleLocation HKCU
-    !insertmacro FoxsocketPruneStaleLocation HKLM
+    !insertmacro RenniePruneStaleLocation HKCU
+    !insertmacro RenniePruneStaleLocation HKLM
   !endif
 !macroend

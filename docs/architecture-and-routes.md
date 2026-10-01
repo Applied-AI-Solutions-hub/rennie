@@ -6,12 +6,12 @@ Scope: public source at main commit `64da418`, reviewed 2026-09-11. This describ
 
 | Component | Source | Responsibility |
 |---|---|---|
-| Electron main process | [main.js](../main.js) | Window lifecycle, persistent workspace state, privileged IPC and chat invocation |
-| Renderer bridge | [preload.js](../preload.js) | Exposes the permitted IPC interface |
-| Workspace | [workspace.js](../workspace.js), [workspace-main.js](../workspace-main.js) | Conversation workspace and local actions |
-| Host management | [host-manager.js](../host-manager.js), [host-main.js](../host-main.js) | WSL inspection and supported preparation operations |
-| Setup | [setup.js](../setup.js), [starter-agent.json](../starter-agent.json) | Local setup record and clean starter manifest |
-| Release checks | [updates.js](../updates.js), [updates-main.js](../updates-main.js) | GitHub release discovery; does not install updates |
+| Electron main process | [main.js](../src/main.js) | Window lifecycle, persistent workspace state, privileged IPC and chat invocation |
+| Renderer bridge | [preload.js](../src/preload.js) | Exposes the permitted IPC interface |
+| Workspace | [workspace.js](../src/workspace.js), [workspace-main.js](../src/workspace-main.js) | Conversation workspace and local actions |
+| Host management | [host-manager.js](../src/host-manager.js), [host-main.js](../src/host-main.js) | WSL inspection and supported preparation operations |
+| Setup | [setup.js](../src/setup.js), [starter-agent.json](../src/starter-agent.json) | Local setup record and clean starter manifest |
+| Release checks | [updates.js](../src/updates.js), [updates-main.js](../src/updates-main.js) | GitHub release discovery; does not install updates |
 
 The desktop renderer is not a public web or remote-control API. Local IPC handlers are implementation interfaces, not network routes. Read the source modules for their current argument contracts rather than using a historical route inventory.
 

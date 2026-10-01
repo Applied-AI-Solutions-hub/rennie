@@ -8,4 +8,4 @@ The Rennie repository is public (verified 2026-09-11). Public release checks nee
 
 Missing/expired access, rate limiting, network failure and no installers each have distinct states. None is reported as up to date. Startup checks work offline by failing quietly; saved work remains available. Mobile distribution and remote application pairing remain planned. They are separate from desktop release discovery.
 
-Validation: updates.test.cjs covers semantic comparison, release filtering, link origin, auth/offline/rate failures, downgrade prevention, concurrent checks, token non-disclosure and timeouts. updates-smoke.cjs verifies a real Electron launch triggers one check and displays the update notice/settings/manual recheck/error states.
+Validation: test/unit/updates.test.cjs covers semantic comparison, release filtering, link origin, auth/offline/rate failures, downgrade prevention, concurrent checks, token non-disclosure and timeouts. updates-smoke.cjs verifies a real Electron launch triggers one check and displays the update notice/settings/manual recheck/error states.
