@@ -3,6 +3,9 @@
   "version": "0.7.0-alpha.1",
   "description": "Rennie personal AI desktop workspace — your agent, your models, your devices",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "author": "Applied AI Solutions",
   "main": "main.js",
   "scripts": {

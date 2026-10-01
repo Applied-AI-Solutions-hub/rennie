@@ -71,7 +71,7 @@ More Host detail: [Host implementation status](docs/managed-host.md).
 
 ## Build from source (developers)
 
-Windows with Node.js 22+ and pnpm 11:
+Windows with Node.js 22.12 or later (CI uses 24) and pnpm 11:
 
 ```powershell
 git clone https://github.com/Applied-AI-Solutions-hub/rennie.git
