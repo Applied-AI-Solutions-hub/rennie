@@ -68,7 +68,7 @@ function executionPlan(model,{gpu,totalMemory}){
   const cuda=!!gpu&&driverAtLeast(gpu.driver,CUDA_DRIVER);
   const build=supported&&cuda&&gpu.videoMemory>=videoRequired?'cuda':'cpu';
   const ramRequired=model.id==='bonsai-2-27b'?16*GB:model.id==='qwen3.5-9b'?12*GB:SMALL_MEMORY;
-  const fits=build==='cuda'||Number.isFinite(totalMemory)&&totalMemory>=ramRequired;
+  const fits=build==='cuda'||model.id==='qwen3.5-4b'||Number.isFinite(totalMemory)&&totalMemory>=ramRequired;
   const reason=build==='cuda'?`Using ${gpu.name} for ${model.label}`:
     gpu&&!cuda?`Using the processor: ${gpu.name} needs NVIDIA driver ${CUDA_DRIVER.join('.')} or newer`:
     supported&&cuda?`Using the processor: this model needs at least ${(videoRequired/GB).toFixed(1)} GB of video memory with the current context`:
@@ -76,8 +76,8 @@ function executionPlan(model,{gpu,totalMemory}){
   return {model:model.id,build,fits,reason,...(!fits?{problem:`${model.label} needs at least ${Math.ceil(ramRequired/GB)} GB of system memory on the processor. Choose a smaller model or use a compatible GPU.`}:{})};
 }
 function choose(hardware,models=MODELS){
-  // Favor the small responsive default; larger models remain explicit choices.
-  const model=models.find(m=>m.id==='qwen3.5-4b')||models.at(-1);
+  // Catalog order is quality preference; CUDA cutoffs include context headroom.
+  const model=models.find(m=>executionPlan(m,hardware).build==='cuda')||models.find(m=>m.id==='qwen3.5-4b')||models.at(-1);
   return {...executionPlan(model,hardware),lowMemory:Number.isFinite(hardware.totalMemory)&&hardware.totalMemory<SMALL_MEMORY};
 }
 function sha256(file){return new Promise((resolve,reject)=>{const hash=crypto.createHash('sha256');fs.createReadStream(file).on('error',reject).on('data',chunk=>hash.update(chunk)).on('end',()=>resolve(hash.digest('hex')));});}
@@ -85,7 +85,8 @@ function sha256(file){return new Promise((resolve,reject)=>{const hash=crypto.cr
 function createLlamaRuntime({directory,sharedModelDirectory=null,fetchImpl=fetch,env=process.env,executeImpl=execute,spawnImpl=spawn,platformName=process.platform,port=18080,taskName=TASK,scheduleEnabled=true,detectImpl=()=>detect({executeImpl}),stallMs=60000,wait,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),startTimeoutMs=300000,builds=BUILDS,models=MODELS,releaseUrl=RELEASE_URL,urlFor=modelUrl}){
   const selections=new Map();
   const get=id=>{const model=models.find(m=>m.id===id);if(!model)throw Error('Choose one of the listed local models.');return {...model,...selections.get(id)};};
-  const plan=async id=>{get(id);return executionPlan(models.find(m=>m.id===id),await detectImpl());};
+  let hardware;
+  const plan=async id=>{get(id);hardware ||= Promise.resolve().then(detectImpl).catch(error=>{hardware=null;throw error;});return executionPlan(models.find(m=>m.id===id),await hardware);};
   async function configure(id,{build}={}){const selected=build?{model:id,build}:await plan(id);if(!build&&!selected.fits)throw Error(selected.problem);if(!builds[selected.build])throw Error('Unsupported local engine.');get(id);selections.set(id,selected);return selected;}
   const buildDir=build=>path.join(directory,'llama',RELEASE+'-'+build);
   const server=build=>path.join(buildDir(build),'llama-server.exe');

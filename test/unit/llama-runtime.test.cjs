@@ -49,9 +49,9 @@ function fixture({serve=files,server={},reply=null,ready=true,runtimeOptions={}}
 
 test('the model tier follows the GPU, its driver and its video memory',()=>{
   const nvidia=(mib,driver='616.92')=>({gpu:{name:'NVIDIA GeForce RTX',videoMemory:mib*1024**2,driver},totalMemory:32*GB});
-  assert.equal(choose(nvidia(16311)).model,'qwen3.5-4b');
-  assert.equal(choose(nvidia(12288)).build,'cuda');
-  assert.equal(choose(nvidia(8188)).build,'cuda');
+  assert.equal(choose(nvidia(16311)).model,'bonsai-2-27b');
+  assert.equal(choose(nvidia(12288)).model,'bonsai-2-27b');
+  assert.equal(choose(nvidia(8188)).model,'qwen3.5-9b');
   assert.equal(choose(nvidia(6144)).model,'qwen3.5-4b','a 6 GB card is below the 9B model’s measured 6,191 MiB');
   assert.equal(choose(nvidia(4096)).model,'qwen3.5-4b');
   const old=choose(nvidia(16311,'531.18'));assert.equal(old.model,'qwen3.5-4b');assert.equal(old.build,'cpu');assert.match(old.reason,/driver 551\.78 or newer/);
@@ -216,4 +216,13 @@ test('a server that never becomes ready is stopped, not left running',async()=>{
   await assert.rejects(f.runtime.start('small'),/did not become ready/);
   assert.ok(f.calls.some(c=>c[0]==='powershell.exe'&&c.at(-1).includes('Stop-Process')),'the started process is ended');
   assert.equal(f.state.running,false);
+});
+
+test('an 8 GB CPU laptop with 7.4 GiB usable RAM can configure the smallest model with a warning',async()=>{
+ const hardware={gpu:null,totalMemory:7.4*GB};
+ assert.equal(choose(hardware).lowMemory,true);assert.equal(executionPlan(MODELS[2],hardware).fits,true);
+ assert.equal(executionPlan(MODELS[1],hardware).fits,false);
+ let detections=0;const f=fixture({runtimeOptions:{models:MODELS,detectImpl:async()=>{detections++;return hardware;}}});
+ assert.equal((await f.runtime.configure('qwen3.5-4b')).build,'cpu');
+ await Promise.all([f.runtime.plan('qwen3.5-4b'),f.runtime.plan('qwen3.5-9b')]);assert.equal(detections,1);
 });
