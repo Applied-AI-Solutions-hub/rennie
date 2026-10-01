@@ -82,20 +82,28 @@ function choose(hardware,models=MODELS){
 }
 function sha256(file){return new Promise((resolve,reject)=>{const hash=crypto.createHash('sha256');fs.createReadStream(file).on('error',reject).on('data',chunk=>hash.update(chunk)).on('end',()=>resolve(hash.digest('hex')));});}
 
-function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeImpl=execute,spawnImpl=spawn,platformName=process.platform,port=18080,taskName=TASK,scheduleEnabled=true,detectImpl=()=>detect({executeImpl}),stallMs=60000,wait,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),startTimeoutMs=300000,builds=BUILDS,models=MODELS,releaseUrl=RELEASE_URL,urlFor=modelUrl}){
+function createLlamaRuntime({directory,sharedModelDirectory=null,fetchImpl=fetch,env=process.env,executeImpl=execute,spawnImpl=spawn,platformName=process.platform,port=18080,taskName=TASK,scheduleEnabled=true,detectImpl=()=>detect({executeImpl}),stallMs=60000,wait,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),startTimeoutMs=300000,builds=BUILDS,models=MODELS,releaseUrl=RELEASE_URL,urlFor=modelUrl}){
   const selections=new Map();
   const get=id=>{const model=models.find(m=>m.id===id);if(!model)throw Error('Choose one of the listed local models.');return {...model,...selections.get(id)};};
   const plan=async id=>{get(id);return executionPlan(models.find(m=>m.id===id),await detectImpl());};
   async function configure(id,{build}={}){const selected=build?{model:id,build}:await plan(id);if(!build&&!selected.fits)throw Error(selected.problem);if(!builds[selected.build])throw Error('Unsupported local engine.');get(id);selections.set(id,selected);return selected;}
   const buildDir=build=>path.join(directory,'llama',RELEASE+'-'+build);
   const server=build=>path.join(buildDir(build),'llama-server.exe');
-  const modelFile=model=>path.join(directory,'models',model.file);
+  const localModelFile=model=>path.join(directory,'models',model.file);
   const keyFile=path.join(directory,'server-key.txt');
   const base=`http://127.0.0.1:${port}`;
   // Hashing a 7 GB model takes a while, so a verified model records its size
   // and time; a later check trusts that record while both still match.
-  const marker=model=>modelFile(model)+'.verified';
-  const verified=model=>{try{const s=fs.statSync(modelFile(model)),m=JSON.parse(fs.readFileSync(marker(model),'utf8'));return m.sha256===model.sha256&&m.size===s.size&&m.mtimeMs===s.mtimeMs;}catch{return false;}};
+  const fileVerified=(model,file)=>{try{const s=fs.statSync(file),m=JSON.parse(fs.readFileSync(file+'.verified','utf8'));return m.sha256===model.sha256&&m.size===s.size&&m.mtimeMs===s.mtimeMs;}catch{return false;}};
+  // Shared caches are read-only: only a verified complete file may be used.
+  // Downloads, partials and verification-marker writes always stay local.
+  const modelFile=model=>{
+    const local=localModelFile(model);
+    if(fileVerified(model,local)||!sharedModelDirectory)return local;
+    const shared=path.join(sharedModelDirectory,model.file);
+    return fileVerified(model,shared)?shared:local;
+  };
+  const verified=model=>fileVerified(model,modelFile(model));
   function needs(id,selected){
     const model={...get(id),...selected},needsBuild=!fs.existsSync(server(model.build)),needsModel=!verified(model);
     const buildBytes=builds[model.build].archives.reduce((sum,a)=>sum+a.bytes,0);
@@ -130,9 +138,10 @@ function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeIm
       for(const archive of builds[model.build].archives)fs.rmSync(path.join(downloads,archive.file),{force:true});
     }
     if(!verified(model)){
-      fs.mkdirSync(path.dirname(modelFile(model)),{recursive:true});
-      await fetchVerified({url:urlFor(model),target:modelFile(model),bytes:model.bytes,sha256:model.sha256,what:model.label+' model',phase:'downloading-model'},progress);
-      const s=fs.statSync(modelFile(model));fs.writeFileSync(marker(model),JSON.stringify({sha256:model.sha256,size:s.size,mtimeMs:s.mtimeMs}));
+      const target=localModelFile(model);
+      fs.mkdirSync(path.dirname(target),{recursive:true});
+      await fetchVerified({url:urlFor(model),target,bytes:model.bytes,sha256:model.sha256,what:model.label+' model',phase:'downloading-model'},progress);
+      const s=fs.statSync(target);fs.writeFileSync(target+'.verified',JSON.stringify({sha256:model.sha256,size:s.size,mtimeMs:s.mtimeMs}));
     }
   }
   // A 256-bit key, created once per install. The server reads it from this file, so it never appears in a process list.

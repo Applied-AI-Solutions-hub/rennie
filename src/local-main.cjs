@@ -31,7 +31,7 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{}) {
     // an unfinished Ollama setup starts again on llama.cpp.
     const ollamaReady=saved&&saved.engine!=='llama'&&saved.phase==='ready'&&!llama.MODELS.some(m=>m.id===saved.model);
     if(!ollamaReady){
-      engine=llama.createLlamaRuntime({directory:engineDir(),...(development?{port:18082,scheduleEnabled:false,taskName:'Rennie development '+require('node:crypto').createHash('sha256').update(app.getPath('userData')).digest('hex').slice(0,12)}:{})});
+      engine=llama.createLlamaRuntime({directory:engineDir(),...(development?{sharedModelDirectory:path.join(process.env.LOCALAPPDATA||app.getPath('userData'),'Rennie','engine','models'),port:18082,scheduleEnabled:false,taskName:'Rennie development '+require('node:crypto').createHash('sha256').update(app.getPath('userData')).digest('hex').slice(0,12)}:{})});
       if(saved&&!llama.MODELS.some(m=>m.id===saved.model))saved={agentName:saved.agentName||null};
     }
     const api=createLocalApi();
@@ -50,7 +50,8 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{}) {
     try{
       const pick=engine?await recommendation():null;
       const selected=engine?await engine.plan(chosen):null;
-      return {...assess(await current.needs(chosen,selected)),...(selected&&!selected.fits?{enoughSpace:false,problem:selected.problem}:{}),selectedBackend:selected?.build,backendReason:selected?.reason,recommended:engine?pick?.model||llama.MODELS.at(-1).id:preflight.recommendModel(os.totalmem(),MODELS),recommendedReason:pick?.reason||null,lowMemory:!!pick?.lowMemory};
+      const needs=await current.needs(chosen,selected);
+      return {...assess(needs),modelCached:!needs.needsModel,...(selected&&!selected.fits?{enoughSpace:false,problem:selected.problem}:{}),selectedBackend:selected?.build,backendReason:selected?.reason,recommended:engine?pick?.model||llama.MODELS.at(-1).id:preflight.recommendModel(os.totalmem(),MODELS),recommendedReason:pick?.reason||null,lowMemory:!!pick?.lowMemory};
     }catch{return null;}
   });
   ipcMain.handle('local-prepare',(_,choice)=>{

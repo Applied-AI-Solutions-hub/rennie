@@ -8,7 +8,7 @@ const builds={cuda:{archives:[{file:'engine.zip',bytes:12,sha256:hash('engine by
 const made=[];process.on('exit',()=>{for(const dir of made)fs.rmSync(dir,{recursive:true,force:true});});
 const models=[{id:'small',label:'Small',build:'cpu',minVideoMemory:0,file:'small.gguf',bytes:13,sha256:hash('model weights')}];
 // A fake Windows: the server, Task Scheduler and the process list share one state.
-function fixture({serve=files,server={},reply=null,ready=true}={}){
+function fixture({serve=files,server={},reply=null,ready=true,runtimeOptions={}}={}){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'rennie llama-')),calls=[],spawned=[],chats=[];made.push(directory);
   const state={health:null,models:[],key:null,running:false,task:null,...server};
   const up=argv=>{state.running=true;state.health=200;state.key=fs.readFileSync(argv[argv.indexOf('--api-key-file')+1],'utf8').trim();state.models=[argv[argv.indexOf('--alias')+1]];};
@@ -43,7 +43,7 @@ function fixture({serve=files,server={},reply=null,ready=true}={}){
     return {stdout:''};
   };
   const spawnImpl=(exe,args)=>{const child=new EventEmitter();child.pid=4242;child.unref=()=>{};spawned.push({exe,args});state.exe=exe;state.running=true;if(ready)setImmediate(()=>up(args));return child;};
-  const runtime=createLlamaRuntime({directory,fetchImpl,executeImpl,spawnImpl,platformName:'win32',env:{SystemRoot:'C:\\Windows'},builds,models,releaseUrl:'https://example.test/release/',urlFor:m=>'https://example.test/models/'+m.file,sleep:()=>new Promise(r=>setImmediate(r)),wait:async()=>{},startTimeoutMs:2000});
+  const runtime=createLlamaRuntime({directory,fetchImpl,executeImpl,spawnImpl,platformName:'win32',env:{SystemRoot:'C:\\Windows'},builds,models,releaseUrl:'https://example.test/release/',urlFor:m=>'https://example.test/models/'+m.file,sleep:()=>new Promise(r=>setImmediate(r)),wait:async()=>{},startTimeoutMs:2000,...runtimeOptions});
   return {directory,runtime,calls,spawned,chats,state};
 }
 
@@ -113,6 +113,31 @@ test('install downloads, verifies and unpacks only what is missing',async()=>{
   assert.ok(phases.includes('downloading-engine')&&phases.includes('unpacking-engine')&&phases.includes('downloading-model'));
   assert.deepEqual(f.runtime.needs('small'),{needsBuild:false,needsModel:false,downloadBytes:0,modelBytes:13,buildBytes:10,unpackedBytes:0});
   const before=f.calls.length;await f.runtime.install('small');assert.equal(f.calls.length,before,'nothing is fetched or unpacked again');
+});
+test('a verified shared model is reused without downloading or changing the shared cache',async()=>{
+  const installed=fixture();await installed.runtime.install('small');
+  const shared=path.join(installed.directory,'models'),file=path.join(shared,'small.gguf');
+  const marker=fs.readFileSync(file+'.verified','utf8');
+  const dev=fixture({runtimeOptions:{sharedModelDirectory:shared}});
+  fs.mkdirSync(path.join(dev.directory,'models'));fs.writeFileSync(path.join(dev.directory,'models','small.gguf.part'),'unfinished');
+  assert.equal(dev.runtime.needs('small').needsModel,false);
+  await dev.runtime.install('small');
+  assert.equal(dev.runtime.paths.modelFile('small'),file);
+  assert.equal(dev.runtime.args('small')[1],file);
+  assert.ok(!dev.calls.some(c=>typeof c==='string'&&c.endsWith('small.gguf')));
+  assert.equal(fs.readFileSync(file+'.verified','utf8'),marker);
+  assert.equal(fs.readFileSync(path.join(dev.directory,'models','small.gguf.part'),'utf8'),'unfinished');
+});
+
+test('invalid shared verification never causes downloads or marker writes in the shared cache',async()=>{
+  const installed=fixture();await installed.runtime.install('small');
+  const shared=path.join(installed.directory,'models'),file=path.join(shared,'small.gguf');
+  fs.writeFileSync(file+'.verified','{}');
+  const dev=fixture({runtimeOptions:{sharedModelDirectory:shared}});
+  assert.equal(dev.runtime.needs('small').needsModel,true);await dev.runtime.install('small');
+  assert.equal(dev.runtime.paths.modelFile('small'),path.join(dev.directory,'models','small.gguf'));
+  assert.equal(fs.readFileSync(file+'.verified','utf8'),'{}');
+  assert.equal(fs.readFileSync(file,'utf8'),'model weights');
 });
 test('a download that does not match its checksum is deleted and never used',async()=>{
   const f=fixture({serve:{...files,'small.gguf':'tampered bits!'.slice(0,13)}});
