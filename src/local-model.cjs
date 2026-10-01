@@ -102,9 +102,9 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
   };
   // What setup still has to download or install. One model-list read answers both
   // "is Ollama running" and "is the model there"; OpenClaw is looked up in parallel.
-  async function needs(model){
+  async function needs(model,selected){
     if(engine){
-      const need=engine.needs(model),claw=openclaw?await openclaw.locate():true;
+      const need=engine.needs(model,selected),claw=openclaw?await openclaw.locate():true;
       return {needsRuntime:need.needsBuild,runtimeDownloadBytes:need.buildBytes,runtimeSpaceBytes:need.unpackedBytes,needsModel:need.needsModel,modelBytes:need.modelBytes,needsOpenClaw:!claw};
     }
     const [present,claw]=await Promise.all([api.installed(model).catch(()=>null),openclaw?openclaw.locate():true]);
@@ -153,6 +153,12 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
     job=Promise.resolve().then(async()=>{
       verifiedModel=null;set({busy:true,quiet:!install&&!probe,phase:'checking',model,agentName,verified:false,error:null,reply:null,total:null,completed:0,message:'Checking this PC.'});
       try {
+        if(engine?.configure){
+          // Only explicit setup changes backend. Quiet reopen retains the saved
+          // backend (or the legacy catalog backend for pre-R7 installations).
+          if(install){const selected=await engine.configure(model);set({build:selected.build,backendReason:selected.reason});}
+          else if(state.build)await engine.configure(model,{build:state.build});
+        }
         if(install)await checkBeforeDownloading(model);
         let startNote=null;
         if(engine){
@@ -162,7 +168,7 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
             await engine.install(model,update=>set({phase:update.phase||'downloading-model',...update},true));
           }
           set({phase:'starting',total:null,completed:0,message:'Starting the local model server on this PC.'});
-          await engine.start(model);
+          await engine.start(model,{allowBackendSwitch:install});
           // Setup also makes the server start when you sign in to Windows. Without that it still starts whenever Rennie opens.
           if(install){try{await engine.schedule(model);}catch(error){startNote=error.message;}}
         }else if(!await api.reachable()) {

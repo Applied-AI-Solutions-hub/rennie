@@ -30,6 +30,12 @@ The report is attached to the run as an artifact and printed in the job log. Eac
 
 ## Development PC
 
+For R7 development, `pnpm dev` uses a separate engine inside `.qa/dev-profile`, port 18082, and no sign-in task registration. OpenClaw operations are disabled in this mode; it tests direct local model chat, not the full agent. The installed engine, key, task and OpenClaw profile stay separate. Model files may be reused locally as read-only hard links; do not copy credentials. `pnpm dev:fresh` creates another isolated profile and does not inherit those assets.
+
+The selected model's backend is resolved during explicit setup. Quiet reopen retains the saved backend; pre-R7 setups retain their legacy backend until the user resumes setup. Check CPU-to-CUDA and CUDA-to-CPU switches of the same model, cache/key reuse, missing replacement engines, and sign-in task path/arguments. CPU-only coverage remains in the sandbox. NVIDIA coverage must include 4B on CUDA. AMD/Intel acceleration and small NVIDIA cards remain unverified; the 4B CUDA threshold of 5.5 GiB is conservative, not a measured minimum. GPU memory contention can still prevent loading.
+
+Local R7 evidence: on a 16 GB NVIDIA card, isolated 4B CUDA startup and both deterministic reply checks passed with zero downloads. NVIDIA's process list included the isolated llama-server and GPU memory rose by approximately 3.9 GiB. These short direct prompts do not measure OpenClaw's cold first reply.
+
 The development PC has an NVIDIA GPU (RTX 5060 Ti, 16 GB) and Smart App Control **on**. Rennie runs there every day, so the test upgrades the real installed copy.
 
 **Rules:**

@@ -7,11 +7,12 @@ const llama=require('./llama-runtime.cjs');
 const preflight=require('./preflight.cjs');
 module.exports=function register(getWindow,onSelected,onReady=()=>{}) {
   let manager,openclaw,engine=null,hardware=null;
+  const development=!app.isPackaged&&process.argv.includes('--rennie-dev');
   // The llama.cpp engine and its models live outside the roaming profile: they are large and belong to this PC.
-  const engineDir=()=>path.join(process.env.LOCALAPPDATA||app.getPath('userData'),'Rennie','engine');
+  const engineDir=()=>development?path.join(app.getPath('userData'),'engine'):path.join(process.env.LOCALAPPDATA||app.getPath('userData'),'Rennie','engine');
   // The largest NVIDIA GPU decides the recommended model. Detected once per run.
   const recommendation=()=>hardware||(hardware=llama.detect().then(found=>llama.choose(found)).catch(()=>null));
-  const claw=()=>openclaw||(openclaw=createOpenClaw({directory:path.join(app.getPath('userData'),'openclaw')}));
+  const claw=()=>{if(development)throw Error('Isolated development tests use direct model chat. OpenClaw operations are disabled to protect the installed assistant.');return openclaw||(openclaw=createOpenClaw({directory:path.join(app.getPath('userData'),'openclaw')}));};
   // Ollama stores models under OLLAMA_MODELS or %USERPROFILE%\.ollama; its runtime, OpenClaw and downloads use the profile drive.
   const free=dir=>{try{const s=fs.statfsSync(dir);return s.bavail*s.bsize;}catch{return NaN;}};
   const drive=dir=>path.parse(path.resolve(dir)).root.toLowerCase();
@@ -21,7 +22,7 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{}) {
     return preflight.assess({freeBytes:free(system),...(models&&drive(models)!==drive(system)?{modelFreeBytes:free(models)}:{}),totalMemory:os.totalmem(),...needs});};
   // One shape for status replies and progress events, so the UI never has to patch fields together.
   const models=()=>engine?llama.MODELS:MODELS;
-  const snapshot=state=>({...state,engine:engine?'llama':'ollama',models:models(),log:state.phase==='attention'&&openclaw?openclaw.log():[]});
+  const snapshot=state=>({...state,development,engine:engine?'llama':'ollama',models:models(),log:state.phase==='attention'&&openclaw?openclaw.log():[]});
   const get=()=>{
     if(manager)return manager;
     const file=path.join(app.getPath('userData'),'local-setup.json');
@@ -30,11 +31,11 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{}) {
     // an unfinished Ollama setup starts again on llama.cpp.
     const ollamaReady=saved&&saved.engine!=='llama'&&saved.phase==='ready'&&!llama.MODELS.some(m=>m.id===saved.model);
     if(!ollamaReady){
-      engine=llama.createLlamaRuntime({directory:engineDir()});
+      engine=llama.createLlamaRuntime({directory:engineDir(),...(development?{port:18082,scheduleEnabled:false,taskName:'Rennie development '+require('node:crypto').createHash('sha256').update(app.getPath('userData')).digest('hex').slice(0,12)}:{})});
       if(saved&&!llama.MODELS.some(m=>m.id===saved.model))saved={agentName:saved.agentName||null};
     }
     const api=createLocalApi();
-    manager=createLocalSetup({api,platform:createWindowsRuntime({directory:path.join(app.getPath('userData'),'installers'),api}),engine,defaultModel:engine?llama.MODELS.at(-1).id:undefined,openclaw:process.platform==='win32'?claw():null,onReady,checkSpace:assess,
+    manager=createLocalSetup({api,platform:createWindowsRuntime({directory:path.join(app.getPath('userData'),'installers'),api}),engine,defaultModel:engine?llama.MODELS.at(-1).id:undefined,openclaw:process.platform==='win32'&&!development?claw():null,onReady,checkSpace:assess,
       read:()=>saved,
       write:value=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(value,null,2));fs.renameSync(file+'.tmp',file);},
       onChange:value=>{const window=getWindow();if(window&&!window.isDestroyed())window.webContents.send('local-progress',snapshot(value));}
@@ -48,7 +49,8 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{}) {
     const current=get(),chosen=typeof model==='string'&&models().some(m=>m.id===model)?model:current.get().model;
     try{
       const pick=engine?await recommendation():null;
-      return {...assess(await current.needs(chosen)),recommended:engine?pick?.model||llama.MODELS.at(-1).id:preflight.recommendModel(os.totalmem(),MODELS),recommendedReason:pick?.reason||null,lowMemory:!!pick?.lowMemory};
+      const selected=engine?await engine.plan(chosen):null;
+      return {...assess(await current.needs(chosen,selected)),...(selected&&!selected.fits?{enoughSpace:false,problem:selected.problem}:{}),selectedBackend:selected?.build,backendReason:selected?.reason,recommended:engine?pick?.model||llama.MODELS.at(-1).id:preflight.recommendModel(os.totalmem(),MODELS),recommendedReason:pick?.reason||null,lowMemory:!!pick?.lowMemory};
     }catch{return null;}
   });
   ipcMain.handle('local-prepare',(_,choice)=>{
