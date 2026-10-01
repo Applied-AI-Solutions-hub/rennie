@@ -13,13 +13,13 @@ function layout({configured=false}={}){
  if(configured)fs.writeFileSync(path.join(home,'.openclaw','openclaw.json'),'{}');
  return {root,home,node:path.join(nodeDir,'node.exe'),entry:path.join(pkg,'openclaw.mjs'),env:{PATH:'C:\\Windows\\System32',FAKEROOT:root,SystemRoot:'C:\\Windows',APPDATA:path.join(root,'appdata')}};
 }
-function fake(l,handlers={}){
+function fake(l,handlers={},clock={now:()=>0,wait:async()=>{}}){
  const calls=[];
  const run=async(exe,args,options={})=>{calls.push({exe,args,options});
   if(exe==='reg.exe')return {code:0,stdout:args[1].startsWith('HKCU')?'    Path    REG_EXPAND_SZ    %FAKEROOT%\\npm;%FAKEROOT%\\nodejs\r\n':'',stderr:''};
   const cmd=args.slice(1).join(' ');for(const [pattern,reply] of Object.entries(handlers))if(cmd.includes(pattern))return typeof reply==='function'?reply(args,options):reply;
   return {code:0,stdout:'',stderr:''};};
- const claw=createOpenClaw({directory:path.join(l.root,'work'),env:l.env,run,home:l.home,platformName:'win32',wait:async()=>{}});
+ const claw=createOpenClaw({directory:path.join(l.root,'work'),env:l.env,run,home:l.home,platformName:'win32',...clock});
  return {claw,calls,cliCalls:()=>calls.filter(c=>c.exe===l.node)};
 }
 test('a fresh install is found through the registry PATH and run directly with node.exe, never cmd.exe',async()=>{
@@ -82,6 +82,27 @@ test('a reply refused with HTTP 401 is tried again once, then the error is shown
  const other=fake(l,{'agent --session-key':{code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'model not found'}})}});
  await assert.rejects(other.claw.chat({message:'x',session:'agent:main:x'}),/model not found/);assert.equal(other.cliCalls().filter(c=>c.args.includes('--session-key')).length,1,'other errors are not retried');
 });
+test('authentication retries share the original deadline, including the retry delay',async()=>{
+ const l=layout();let time=0,attempt=0;
+ const refused={code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'HTTP 401'}})};
+ const f=fake(l,{'agent --session-key':()=>{if(++attempt===1){time+=40000;return refused;}return {code:0,stdout:'{"ok":true,"status":"ok","final":"blue"}'};}},{now:()=>time,wait:async ms=>{time+=ms;}});
+ assert.equal((await f.claw.chat({message:'x',session:'agent:main:x',timeoutSeconds:90})).content,'blue');
+ const calls=f.cliCalls().filter(c=>c.args.includes('--session-key'));
+ assert.deepEqual(calls.map(c=>c.args[c.args.indexOf('--timeout')+1]),['90','35']);
+ assert.equal(calls[1].options.timeout,95000,'remaining reply time plus one CLI shutdown grace');
+ assert.equal(fs.readdirSync(path.join(l.root,'work','messages')).length,0);
+});
+
+test('an exhausted reply budget does not retry or accept a timed-out partial result',async()=>{
+ const l=layout();let time=0,waited=false;
+ const f=fake(l,{'agent --session-key':()=>{time=80000;return {code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'HTTP 401'}})};}},{now:()=>time,wait:async()=>{waited=true;}});
+ await assert.rejects(f.claw.chat({message:'x',session:'agent:main:x',timeoutSeconds:90}),/did not reply in time/);
+ assert.equal(waited,false);assert.equal(f.cliCalls().filter(c=>c.args.includes('--session-key')).length,1);
+ const g=fake(l,{'agent --session-key':{code:null,timedOut:true,stdout:'{"ok":true,"status":"ok","final":"partial"}'}});
+ await assert.rejects(g.claw.chat({message:'x',session:'agent:main:x'}),/did not reply in time/);
+ assert.equal(fs.readdirSync(path.join(l.root,'work','messages')).length,0);
+});
+
 test('agent failures surface OpenClaw’s own explanation instead of a generic error',async()=>{
  const l=layout();
  const f=fake(l,{'agent --session-key':{code:1,stdout:JSON.stringify({ok:false,status:'error',error:{message:'model llama3.2:3b not found',kind:'model'}})}});

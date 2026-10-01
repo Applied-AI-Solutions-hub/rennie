@@ -75,7 +75,7 @@ async function connect(url){
   const send=(method,params)=>new Promise(resolve=>{const n=++id;pending.set(n,resolve);ws.send(JSON.stringify({id:n,method,params}));});
   const evaluate=async(expression,timeoutMs=120000)=>{
     const reply=await Promise.race([send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true}),sleep(timeoutMs).then(()=>({timeout:true}))]);
-    if(reply.timeout)throw Error('no answer within '+Math.round(timeoutMs/1000)+' s');
+    if(reply.timeout){const error=Error('no answer within '+Math.round(timeoutMs/1000)+' s; stopping because the request may still be running');error.requestPending=true;throw error;}
     if(reply.result?.exceptionDetails)throw Error(reply.result.exceptionDetails.exception?.description?.split('\n')[0]||'failed');
     return reply.result?.result?.value;
   };
@@ -93,7 +93,7 @@ async function waitForSetup(c,timeoutMs){
 }
 async function ask(c,text){
   // Leave room beyond OpenClaw's 15-minute reply budget and its CLI shutdown grace.
-  const [result,seconds]=await timed(async()=>{try{const state=await c.invoke('chat',text,17*60000);const last=state.chat.at(-1);return {ok:last?.role==='assistant',text:String(last?.text||''),provider:last?.provider};}catch(error){return {ok:false,error:error.message};}});
+  const [result,seconds]=await timed(async()=>{try{const state=await c.invoke('chat',text,17*60000);const last=state.chat.at(-1);return {ok:last?.role==='assistant',text:String(last?.text||''),provider:last?.provider};}catch(error){if(error.requestPending)throw error;return {ok:false,error:error.message};}});
   return {...result,seconds};
 }
 // Rennie's own server only: llama-server.exe running from its engine folder.

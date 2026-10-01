@@ -59,7 +59,7 @@ function readAgentReply(j){
 }
 function expand(value,env){return value.replace(/%([^%]+)%/g,(whole,name)=>{const key=Object.keys(env).find(k=>k.toLowerCase()===name.toLowerCase());return key?env[key]:whole;});}
 
-function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetch,exists=fs.existsSync,readText=file=>fs.readFileSync(file,'utf8'),home=os.homedir(),platformName=process.platform,wait=sleep,installSha256=INSTALL_SHA256}={}){
+function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetch,exists=fs.existsSync,readText=file=>fs.readFileSync(file,'utf8'),home=os.homedir(),platformName=process.platform,wait=sleep,now=Date.now,installSha256=INSTALL_SHA256}={}){
   let located=null,lastLog=[];
   // `gateway status` starts a node process and the app asks every 30 s, so a
   // recent answer is reused. Setup, repair and failed chats force a fresh one.
@@ -194,11 +194,18 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
   async function chat({message,session,timeoutSeconds=900}){
     if(typeof message!=='string'||!message.trim())throw Error('Enter a message.');
     if(!SESSION.test(String(session)))throw Error('This conversation has an invalid session. Start a new chat.');
+    if(!Number.isFinite(timeoutSeconds)||timeoutSeconds<1)throw Error('Reply timeout must be at least one second.');
+    const deadline=now()+timeoutSeconds*1000;
+    const timeoutError=()=>Error('Your assistant did not reply in time. The first reply after starting can take several minutes on the processor. Check This PC, then try again.');
     fs.mkdirSync(path.join(directory,'messages'),{recursive:true});
     const file=path.join(directory,'messages',crypto.randomUUID()+'.txt');
     fs.writeFileSync(file,message,{encoding:'utf8',mode:0o600});
     const ask=async()=>{
-      const r=await cli(['agent','--session-key',session,'--message-file',file,'--json','--timeout',String(timeoutSeconds)],{timeout:(timeoutSeconds+60)*1000});
+      // A retry spends the remaining budget; it must not start a second full wait.
+      const remaining=deadline-now(),seconds=Math.floor(remaining/1000);
+      if(seconds<1)throw timeoutError();
+      const r=await cli(['agent','--session-key',session,'--message-file',file,'--json','--timeout',String(seconds)],{timeout:remaining+60000});
+      if(r.timedOut)throw timeoutError();
       let result;try{result=json(r.stdout);}catch{throw Error(r.timedOut?'Your assistant did not reply in time.':'OpenClaw did not return a reply. Check that its gateway is running in This PC.');}
       const reply=readAgentReply(result);
       if(!reply.ok)throw Error(reply.status==='timeout'?'Your assistant did not reply in time. The first reply after starting can take several minutes on the processor. Check This PC, then try again.':String(reply.error||'OpenClaw could not complete the reply.').slice(0,300));
@@ -209,7 +216,7 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
       // llama.cpp server without the key it had saved (HTTP 401), while a later request worked. OpenClaw's own
       // message says to try again in a moment, so a 401 is retried once after a short wait.
       try{return await ask();}
-      catch(error){if(!/HTTP 401/.test(error.message))throw error;keep(lastLog,'OpenClaw returned HTTP 401; trying the reply again once.',80);await wait(15000);return await ask();}
+      catch(error){if(!/HTTP 401/.test(error.message))throw error;if(deadline-now()<=15000)throw timeoutError();keep(lastLog,'OpenClaw returned HTTP 401; trying the reply again once within the original reply deadline.',80);await wait(15000);return await ask();}
     }catch(error){forgetGateway();throw error;}finally{fs.rmSync(file,{force:true});}
   }
   async function doctor(){

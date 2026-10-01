@@ -72,6 +72,6 @@ Use a separate Git checkout per machine or agent, fetch before starting, and sub
 
 - **Signing:** the SignPath Foundation application (#3). Until then, protected consumer PCs may block the installer.
 - **Processor path on real hardware:** only the sandbox VM covers it now.
-- **First reply on the processor:** 10–14 minutes on the sandbox VM's 4 cores. A warm-up at sign-in is planned.
+- **First reply on the processor:** sandbox run 36806197972 passed setup and upgrade but exceeded the 17-minute test deadline after a simulated restart. Its subsequent repair failure happened while the earlier request could still be running, so it needs an independent rerun. Authentication retries now share the original 15-minute reply budget, and the sandbox stops if its own deadline expires rather than starting repair against an unresolved request. These changes bound the wait; they do not establish a latency improvement. A warm-up at sign-in is planned.
 - **OpenClaw background jobs:** OpenClaw runs its own heartbeat every 30 minutes, which can wake the model.
 - **Ollama:** kept only for installs already set up on it; removal is planned.
