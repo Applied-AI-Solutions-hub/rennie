@@ -1,14 +1,10 @@
 # Rennie
 
-Formerly Foxsocket. Rennie is the product and the default name for new agents; existing names such as Sparky are preserved.
-
 **Your agent. Your devices. Connected.**
 
 Open-source personal AI desktop workspace by [Applied AI Solutions](https://appliedai.solutions), with its fox mascot.
 
 This is an **early Windows alpha (0.7.0-alpha.1)** for testers. It is not a finished agent hosting platform yet. What it takes to reach beta: [beta criteria](docs/beta-criteria.md).
-
-This repository starts from Foxsocket's final snapshot. The earlier history, releases and pull requests are kept in the archived predecessor repository.
 
 ## Quick start (Windows testers)
 
@@ -35,12 +31,12 @@ Focus on these paths:
 
 ### In this alpha
 
-- **OpenClaw is the backbone (since the alpha.7 development build).** One setup button downloads a pinned, checksum-verified llama.cpp engine and a model chosen for this PC (Ollama for setups made before 0.7.0-alpha.1), then installs OpenClaw natively on Windows (no Ubuntu/WSL), configures it for that model, and confirms a first reply through OpenClaw. Chat then goes through OpenClaw. See [what changed and what is still being tested](docs/openclaw-backbone.md).
+- **OpenClaw is the backbone.** One setup button downloads a pinned, checksum-verified llama.cpp engine and a model chosen for this PC (Ollama for setups made before 0.7.0-alpha.1), then installs OpenClaw natively on Windows (no Ubuntu/WSL), configures it for that model, and confirms a first reply through OpenClaw. Chat then goes through OpenClaw. See [what changed and what is still being tested](docs/openclaw-backbone.md).
 - One-click installer with no questions; disk space and memory checked before any download; downloads that resume after a stall with no time limit; OpenClaw doctor and repair from the setup page.
 - Native Windows local-model setup: resumable, verified downloads, a model server that listens on this PC only with a per-install key and starts at sign-in, a real reply check, and persistent Resume setup navigation.
 - Desktop install and workspace basics (tasks, notes, folders, settings)
 - Host readiness / service controls for an existing OpenClaw setup
-- Clean **Rennie** starter manifest (rename allowed; no personal credentials or memory bundled)
+- Clean **Rennie** starter agent (you can rename it; no personal credentials or memory bundled)
 - Startup update checks against the public GitHub release
 
 ### Not finished yet
@@ -81,7 +77,15 @@ pnpm start
 ```
 
 - `pnpm dist` — Windows installer into `release`
-- `node --test host-manager.test.cjs setup.test.cjs updates.test.cjs` and `pnpm test:ui` — checks
+- `pnpm test` — unit tests; `pnpm test:ui` — the workspace smoke test
+
+| Folder | What it holds |
+|---|---|
+| `src/` | The app: main process, window, styles, `assets/` and the starter `agent/` |
+| `test/unit/` | Unit tests (`node --test`) and PowerShell tests for the build scripts |
+| `test/smoke/` | Tests that open the real app window with stand-ins (`electron test/smoke/<name>.cjs`) |
+| `build/` | Installer scripts, the UI bundler and the sandbox acceptance script |
+| `docs/` | Guides, the [testing guide](docs/testing.md) and an archive of earlier plans |
 
 See [Contributing](CONTRIBUTING.md) and [Host implementation status](docs/managed-host.md).
 
@@ -89,7 +93,7 @@ See [Contributing](CONTRIBUTING.md) and [Host implementation status](docs/manage
 
 Original code is [MIT](LICENSE). See [third-party notices](THIRD-PARTY-NOTICES.md).
 
-The program is `Rennie.exe` and the profile is `%APPDATA%\Rennie`. A profile from Foxsocket is moved there automatically the first time Rennie starts. The package name and app ID stay the same so upgrades and saved settings still match, so some internal names still refer to Foxsocket or Applied AI Command Center.
+The program is `Rennie.exe` and the profile is `%APPDATA%\Rennie`. A profile from an earlier version is moved there automatically the first time Rennie starts.
 
 ## Documentation
 

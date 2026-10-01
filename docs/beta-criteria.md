@@ -17,4 +17,4 @@ Rennie stays in **alpha** until every item below is met. Each one needs a record
 
 ## History
 
-Rennie was previously developed as Foxsocket. This repository starts from Foxsocket's final snapshot; the earlier history is kept in the archived predecessor repository.
+Earlier releases and their history are kept in an archived predecessor repository; see the [archive](archive/) for the plans and reviews that led here.

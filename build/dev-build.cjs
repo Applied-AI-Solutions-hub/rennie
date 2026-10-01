@@ -3,9 +3,9 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 console.log('Building an UNSIGNED DEVELOPMENT installer. Windows Application Control may block it.');
 console.log('No signing account is required and no Windows security settings are changed.');
-const env = { ...process.env, FOXSOCKET_UNSIGNED_VALIDATION: '1' };
+const env = { ...process.env, RENNIE_UNSIGNED_VALIDATION: '1' };
 for (const args of [
-  ['build-ui.mjs'],
+  ['build/build-ui.mjs'],
   ['build/render-maker.cjs'],
   [require.resolve('electron-builder/cli.js'), '--config', 'electron-builder.cjs', '--win', 'nsis', '--publish', 'never'],
 ]) {

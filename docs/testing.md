@@ -5,7 +5,7 @@ Rennie is tested in three layers. Each layer covers what the one before it can't
 | Layer | When it runs | What it covers | What it can't show |
 |---|---|---|---|
 | **PR checks** (`windows-test-installer.yml`) | Every pull request | Unit tests, app smoke tests with stand-ins, the unsigned development installer | Anything that needs a real model, OpenClaw or an installed app |
-| **Sandbox** (`windows-sandbox-acceptance.yml`) | A pull request with the `sandbox` label, or started by hand from the Actions tab | The real installed app on a throwaway Windows VM: install, processor setup through OpenClaw, chat, privacy checks, reopen, recovery, reinstall, uninstall, and an upgrade from the pre-rename Foxsocket build | A GPU, a real Windows sign-in or restart, Smart App Control, a consumer PC |
+| **Sandbox** (`windows-sandbox-acceptance.yml`) | A pull request with the `sandbox` label, or started by hand from the Actions tab | The real installed app on a throwaway Windows VM: install, processor setup through OpenClaw, chat, privacy checks, reopen, recovery, reinstall, uninstall, and an upgrade from the build before the rename | A GPU, a real Windows sign-in or restart, Smart App Control, a consumer PC |
 | **Development PC** (below) | Before a merge that changes setup, the engine or the installer | The NVIDIA path, a real restart, Smart App Control, and an upgrade of a real installed copy | A clean consumer PC with no earlier setup |
 
 The Lenovo is no longer part of testing (owner decision, 2026-09-30). Its procedure is kept in [archive/LENOVO-START-HERE.md](archive/LENOVO-START-HERE.md).

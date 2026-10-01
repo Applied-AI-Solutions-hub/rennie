@@ -1,4 +1,4 @@
-// Foxsocket engine lab: starts PrismML llama-server with one model and measures
+// Rennie engine lab: starts PrismML llama-server with one model and measures
 // what the product decision needs. Usage:
 //   node bench.cjs <name> <model.gguf> <gpu|cpu> [ctx=32768]
 // Appends one JSON line per run to results.jsonl.

@@ -6,7 +6,7 @@ Native Windows local chat is the primary Host setup. `local-main.cjs` connects t
 
 The installer now opens model setup instead of automatically installing Ubuntu. The older OpenClaw service manager below remains an optional integration; it cannot block direct-provider/local chat. Hosted account access is displayed separately from readiness and a real chat reply is required for readiness in the current app session.
 
-Tests: `node --test local-model.test.cjs local-runtime.test.cjs`, `pnpm exec electron local-smoke.cjs`, plus the existing Host/workspace/update tests. Runtime install, downloads and inference are mocked in automation. Real Ollama installation, model inference and Windows reboot recovery must be verified on the Lenovo.
+Tests: `node --test test/unit/local-model.test.cjs test/unit/local-runtime.test.cjs`, `pnpm exec electron test/smoke/local-smoke.cjs`, plus the existing Host/workspace/update tests. Runtime install, downloads and inference are mocked in automation. Real Ollama installation, model inference and Windows reboot recovery must be verified on the Lenovo.
 
 ## Optional OpenClaw manager
 
@@ -14,7 +14,7 @@ The Host page replaces the terminal-command walkthrough with a live control scre
 
 ## Implemented
 
-- The optional Ubuntu/OpenClaw page opens the bundled Windows/Ubuntu setup window. It enables WSL with a Windows permission prompt, saves progress through a restart, and installs Ubuntu 24.04 for the original Windows user. A new environment gets a regular `foxsocket` Linux account and systemd automatically; existing environments are preserved.
+- The optional Ubuntu/OpenClaw page opens the bundled Windows/Ubuntu setup window. It enables WSL with a Windows permission prompt, saves progress through a restart, and installs Ubuntu 24.04 for the original Windows user. A new environment gets a regular `rennie` Linux account and systemd automatically; existing environments are preserved.
 - Host navigation, responsive control screen, real prerequisite/service/startup checks, progress and recoverable errors.
 - Hidden execution through WSL `--exec`. OpenClaw arguments stay positional, including chat messages containing shell metacharacters.
 - Reuse an existing configured agent. If the CLI is missing, a supported Linux environment can install pinned OpenClaw 2026.9.3 with the official user-prefix installer.
@@ -48,10 +48,10 @@ Startup is configured after Windows sign-in, not before login. The PC must be aw
 
 ## Validation
 
-Run `node --test host-manager.test.cjs setup.test.cjs updates.test.cjs`, `pnpm test:ui`, `pnpm exec electron host-smoke.cjs`, and `pnpm exec electron updates-smoke.cjs`. Host UI checks cover progress, retry, existing agent selection, honest Tailscale status, and 1440/1000/760 pixel widths.
+Run `node --test test/unit/host-manager.test.cjs test/unit/setup.test.cjs test/unit/updates.test.cjs`, `pnpm test:ui`, `pnpm exec electron test/smoke/host-smoke.cjs`, and `pnpm exec electron test/smoke/updates-smoke.cjs`. Host UI checks cover progress, retry, existing agent selection, honest Tailscale status, and 1440/1000/760 pixel widths.
 
 Run `powershell -NoProfile -ExecutionPolicy Bypass -File build/host-setup.test.ps1` for isolated prerequisite orchestration tests. These mock Windows servicing and WSL; they do not replace a fresh Windows VM test covering real UAC, download, reboot/sign-in recovery, default Linux user and systemd. The installer must also be built with `pnpm dist` to validate the NSIS hooks and bundled helper files.
 
 Background Windows startup recovery and actual reboot behavior have not passed end-to-end validation. A stopped task was observed during development; this remains a release limitation.
 
-The Electron lifecycle checks (`pnpm exec electron host-lifecycle-smoke.cjs` and the same command with `--preparing`) verify that normal close exits the app and that an active preparation job finishes before exit. These isolated checks do not prove actual Windows startup recovery.
+The Electron lifecycle checks (`pnpm exec electron test/smoke/host-lifecycle-smoke.cjs` and the same command with `--preparing`) verify that normal close exits the app and that an active preparation job finishes before exit. These isolated checks do not prove actual Windows startup recovery.

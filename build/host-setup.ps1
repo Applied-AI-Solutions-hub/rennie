@@ -17,15 +17,15 @@ Add-Type -AssemblyName System.Drawing
 # Keep distro registration in the installing user's account. Elevate only the
 # fixed, system-wide WSL installation command, never this script or saved state.
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$mutex = New-Object Threading.Mutex($false, ('Local\FoxsocketHostSetup-' + $identity.User.Value))
+$mutex = New-Object Threading.Mutex($false, ('Local\RennieHostSetup-' + $identity.User.Value))
 if (!$mutex.WaitOne(0)) { exit 0 }
-$setupDir = Join-Path $env:LOCALAPPDATA 'Foxsocket\HostSetup'
+$setupDir = Join-Path $env:LOCALAPPDATA 'Rennie\HostSetup'
 $stateFile = Join-Path $setupDir 'progress.json'
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $powerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $wsl = Join-Path $env:SystemRoot 'System32\wsl.exe'
 if (!(Test-Path -LiteralPath $AppPath)) {
-    Remove-ItemProperty -Path $runKey -Name 'FoxsocketHostSetup' -ErrorAction SilentlyContinue
+    Remove-ItemProperty -Path $runKey -Name 'RennieHostSetup', 'FoxsocketHostSetup' -ErrorAction SilentlyContinue
     [Windows.Forms.MessageBox]::Show('Rennie is no longer at its installation location. Reinstall Rennie to resume Host setup. Linux has been preserved.', 'Rennie setup') | Out-Null
     $mutex.ReleaseMutex(); $mutex.Dispose(); exit 1
 }
@@ -51,8 +51,8 @@ function Set-Resume([bool]$Enabled) {
         }
         $command = Get-HostSetupResumeCommand $powerShell (Join-Path $setupDir 'host-setup.ps1') $AppPath
         if (!(Test-Path $runKey)) { New-Item -Path $runKey -Force | Out-Null }
-        New-ItemProperty -Path $runKey -Name 'FoxsocketHostSetup' -Value $command -PropertyType String -Force | Out-Null
-    } else { Remove-ItemProperty -Path $runKey -Name 'FoxsocketHostSetup' -ErrorAction SilentlyContinue }
+        New-ItemProperty -Path $runKey -Name 'RennieHostSetup' -Value $command -PropertyType String -Force | Out-Null
+    } else { Remove-ItemProperty -Path $runKey -Name 'RennieHostSetup', 'FoxsocketHostSetup' -ErrorAction SilentlyContinue }
 }
 function Get-Distros {
     # Registry inventory does not start Linux or confuse an unavailable CLI with
@@ -198,14 +198,14 @@ function Start-HostSetup {
         if (@(Get-Distros) -notcontains 'Ubuntu-24.04') { throw 'Ubuntu has not registered yet. Choose Try again to finish installation.' }
     }
     $script:progress.phase = 'initialize'; Save-Progress
-    Write-Stage 'Creating the Linux account Rennie uses (named foxsocket) and enabling its background service manager.'
+    Write-Stage 'Creating the Linux account Rennie uses (named rennie) and enabling its background service manager.'
     $result = Invoke-SetupProcess $wsl '-d Ubuntu-24.04 -u root --exec sh -s' (Get-HostSetupLinuxScript)
     Require-Success $result 'Ubuntu account setup'
     Require-Success (Invoke-SetupProcess $wsl '--terminate Ubuntu-24.04' -TimeoutSeconds 60) 'Ubuntu restart'
     Write-Stage 'Checking Ubuntu can start with the new account and service manager.'
     $result = Invoke-SetupProcess $wsl '-d Ubuntu-24.04 --exec sh -c "id -un; ps -p 1 -o comm="' -TimeoutSeconds 120
     Require-Success $result 'Ubuntu verification'
-    if ($result.output -notmatch '(?m)^foxsocket\s*$' -or $result.output -notmatch '(?m)^systemd\s*$') { throw 'Ubuntu is installed but its account or background service manager is not ready. Choose Try again.' }
+    if ($result.output -notmatch '(?m)^(rennie|foxsocket)\s*$' -or $result.output -notmatch '(?m)^systemd\s*$') { throw 'Ubuntu is installed but its account or background service manager is not ready. Choose Try again.' }
     $script:progress.phase = 'complete'; $script:progress.ownsUbuntu = $false; Save-Progress; Set-Resume $false
     Write-Stage 'Ubuntu is ready. Continue in Rennie to prepare OpenClaw and connect your AI account. A model reply is still required to finish agent setup.'
     $script:nextAction = 'open'; $action.Text = 'Open Rennie'

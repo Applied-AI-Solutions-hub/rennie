@@ -1,6 +1,6 @@
 // PR builds compile only. Installers for people must use a verified publisher.
 module.exports = function windowsSigning(env) {
-  if (env.FOXSOCKET_UNSIGNED_VALIDATION === '1') {
+  if (env.RENNIE_UNSIGNED_VALIDATION === '1') {
     if (env.GITHUB_ACTIONS === 'true' && env.GITHUB_EVENT_NAME !== 'pull_request') {
       throw new Error('Unsigned CI packaging is only permitted for pull_request validation.');
     }

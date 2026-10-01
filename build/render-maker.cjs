@@ -2,7 +2,7 @@ const sharp = require('sharp');
 const fs = require('node:fs');
 const path = require('node:path');
 async function artwork(name, width) {
-  const trimmed = await sharp(path.join(__dirname, '..', 'assets', name), { density: 192 }).trim().png().toBuffer();
+  const trimmed = await sharp(path.join(__dirname, '..', 'src', 'assets', name), { density: 192 }).trim().png().toBuffer();
   return sharp(trimmed).resize({ width }).png().toBuffer({ resolveWithObject: true });
 }
 async function main() {

@@ -4,7 +4,7 @@ release/
 .env.*
 !.env.example
 state.json
-foxsocket-providers.json
+providers.json
 *.log
 smoke-result.json
 preview.png

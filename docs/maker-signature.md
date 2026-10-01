@@ -6,7 +6,7 @@ The maker signature is independent of the public product name, agent name, and m
 
 Reuse build/maker-splash.nsh and the generated build/applied-ai-maker.bmp across NSIS installers. Insert AppliedAIMakerSplash into an existing customInit macro if one already exists. The current include is build/installer.nsh, discovered by electron-builder.
 
-Artwork comes from assets/canonical-mark.svg and assets/wordmark.svg. The build-only Sharp renderer trims transparent padding, centers the existing artwork, and writes PNG and 24-bit BMP. Run pnpm render:maker; pnpm dist also does this automatically, without requiring an open desktop window. Review build/applied-ai-maker.png after changes. build/maker-splash.html previews the generated image using equivalent CSS timings; native NSIS rendering still needs visual acceptance on Windows.
+Artwork comes from src/assets/canonical-mark.svg and src/assets/wordmark.svg. The build-only Sharp renderer trims transparent padding, centers the existing artwork, and writes PNG and 24-bit BMP. Run pnpm render:maker; pnpm dist also does this automatically, without requiring an open desktop window. Review build/applied-ai-maker.png after changes. build/maker-splash.html previews the generated image using equivalent CSS timings; native NSIS rendering still needs visual acceptance on Windows.
 
 The browser preview respects reduced motion. Native reduced-motion behavior has not yet been implemented or verified and remains a release check.
 
