@@ -14,7 +14,7 @@ This repository starts from Foxsocket's final snapshot. The earlier history, rel
 
 **No Rennie installer has been released yet.** Installers are unsigned until the free SignPath Foundation signing is set up ([signing status](docs/windows-signing.md)), and Smart App Control blocks unsigned installers.
 
-- **Development PCs:** use the **Rennie-Windows-UNSIGNED-DEVELOPMENT** artifact from the current pull request's CI run, or run `pnpm dev:fresh` from source. See [development setup and Windows policy instructions](docs/development.md) and the [tester handoff](LENOVO-START-HERE.md).
+- **Development PCs:** use the **Rennie-Windows-UNSIGNED-DEVELOPMENT** artifact from the current pull request's CI run, or run `pnpm dev:fresh` from source. See [development setup and Windows policy instructions](docs/development.md) and the [testing guide](docs/testing.md).
 
 ### Installer notes
 
@@ -45,9 +45,9 @@ Focus on these paths:
 
 ### Not finished yet
 
-- Signed installers (pending the free SignPath Foundation application); unsigned builds are blocked by Smart App Control
+- Signed installers (pending the free SignPath Foundation application); Smart App Control may block unsigned builds
 - Fresh-PC validation of the native OpenClaw install and onboarding, and revalidation after restarting Windows
-- End-to-end “fresh PC → first agent reply through OpenClaw” remains an acceptance test on the Lenovo
+- End-to-end “fresh PC → first agent reply through OpenClaw” on a real consumer PC; the [sandbox](docs/testing.md) covers it on a throwaway Windows VM
 - Remote application pairing, iPhone/iPad clients, and cross-device conversation sync
 - Treating a connected Tailscale network as app pairing (Tailscale is the intended private path; pairing itself is not implemented)
 - Proven Windows background-task recovery and reboot persistence

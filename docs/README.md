@@ -1,6 +1,6 @@
 # Documentation index
 
-Reviewed 2026-09-11 against main `64da418`; on 2026-09-30 historical plans and reviews moved to [archive/](archive/). The published release, current source and proposed work are separate. Public documentation must not contain a maintainer's private machine inventory or personal assistant state.
+Reviewed 2026-09-11 against main `64da418`; on 2026-09-30 historical plans and reviews moved to [archive/](archive). The published release, current source and proposed work are separate. Public documentation must not contain a maintainer's private machine inventory or personal assistant state.
 
 ## Getting started and current source
 
@@ -13,12 +13,12 @@ Reviewed 2026-09-11 against main `64da418`; on 2026-09-30 historical plans and r
 - [Product architecture and source map](architecture-and-routes.md)
 - [Release checks](updates.md)
 - [Contributing](../CONTRIBUTING.md)
-- [Working across PCs](../WORKING-ON-TWO-PCS.md)
+- [Testing Rennie: PR checks, the sandbox and the development PC](testing.md)
 - [Design standards](design-standards.md) and [maker signature](maker-signature.md)
 
 ## Archive: earlier plans and checks
 
-These describe intentions or earlier checks, not a promise that the current release implements them. They are kept for the record in [archive/](archive/).
+These describe intentions or earlier checks, not a promise that the current release implements them. They are kept for the record in [archive/](archive).
 
 - [Next-build plan](archive/next-build-plan.md)
 - [Visual-pass proposal](archive/visual-pass.md)
