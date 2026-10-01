@@ -191,7 +191,7 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
   // A cold CPU model can spend more than five minutes reading OpenClaw's
   // initial prompt. Apply the same bounded budget to setup and later chats:
   // the first request after a Windows restart is cold too.
-  async function chat({message,session,timeoutSeconds=900}){
+  async function chat({message,session,timeoutSeconds=1800}){
     if(typeof message!=='string'||!message.trim())throw Error('Enter a message.');
     if(!SESSION.test(String(session)))throw Error('This conversation has an invalid session. Start a new chat.');
     if(!Number.isFinite(timeoutSeconds)||timeoutSeconds<1)throw Error('Reply timeout must be at least one second.');

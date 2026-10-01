@@ -138,7 +138,7 @@ function createLocalSetup({read=()=>null,write=()=>{},api,platform,engine=null,d
     if(!agent)throw Error('OpenClaw has no agent configured. Choose Run OpenClaw doctor to see why.');
     // Reopening Rennie only checks the gateway, so it never adds messages to your agent.
     if(!probe)return {agent,reused};
-    set({phase:'verifying-openclaw',message:'Your assistant is waking up. OpenClaw is preparing its first reply; on the processor this can take several minutes. Please keep Rennie open. We allow up to 15 minutes for this reply.'});
+    set({phase:'verifying-openclaw',message:'Your assistant is waking up. OpenClaw is preparing its first reply; on the processor this can take several minutes. Please keep Rennie open. We allow up to 30 minutes for this first reply on slower PCs.'});
     const check=require('./local-chat.cjs').CHECKS[0];
     const reply=await openclaw.chat({message:check.prompt,session:`agent:${agent.id}:${SETUP_SESSION}`});
     // The model OpenClaw actually answered with. An existing OpenClaw setup keeps its own model.
