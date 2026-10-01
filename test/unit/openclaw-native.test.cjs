@@ -189,3 +189,25 @@ test('the real process runner streams lines and enforces its timeout',async()=>{
  assert.equal(r.code,0);assert.deepEqual(lines.sort(),['one','two']);
  const slow=await runProcess(process.execPath,['-e','setTimeout(()=>{},10000)'],{timeout:200});assert.equal(slow.timedOut,true);
 });
+
+test('native cancellation targets the current session through the gateway',async()=>{
+ const f=fake(layout(),{'agent:main:test':{code:0,stdout:'{"ok":true,"aborted":true}'}});
+ assert.equal((await f.claw.cancelChat('agent:main:test')).aborted,true);
+ const a=f.cliCalls()[0].args;assert.equal(path.basename(a[0]),'openclaw-cancel.mjs');assert.equal(a[2],'agent:main:test');
+ await assert.rejects(f.claw.cancelChat('wrong;session'),/Invalid/);
+});
+test('native config changes use a temporary patch file and remove it after a failed validation',async()=>{
+ let file;const f=fake(layout(),{'config patch':args=>{file=args[args.indexOf('--file')+1];assert.deepEqual(JSON.parse(fs.readFileSync(file)),{skills:{entries:{research:{enabled:false}}}});return {code:1,stdout:'invalid'};}});
+ await assert.rejects(f.claw.configPatch({skills:{entries:{research:{enabled:false}}}}),/did not accept/);assert.equal(fs.existsSync(file),false);
+});
+
+test('confirmed native cancellation is reported as stopped rather than a timeout',async()=>{
+ let finish;let entered;const started=new Promise(r=>entered=r);
+ const f=fake(layout(),{'agent --session-key':()=>{entered();return new Promise(r=>finish=r);},'agent:main:cancelled':()=>{finish({code:1,stdout:'{"status":"timeout"}'});return {code:0,stdout:'{"ok":true,"aborted":true}'};}});
+ const chat=f.claw.chat({message:'Wait',session:'agent:main:cancelled'});await started;await f.claw.cancelChat('agent:main:cancelled');await assert.rejects(chat,/Reply stopped/);
+});
+
+test('explicit restart never reports success when the native restart command fails',async()=>{
+ const f=fake(layout(),{'gateway restart':{code:1,stdout:'',stderr:'service unavailable'}});
+ await assert.rejects(f.claw.restartGateway({required:true}),/could not confirm the restart/);
+});

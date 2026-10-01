@@ -1,11 +1,11 @@
-const {app,ipcMain,dialog}=require('electron');
+const {app,ipcMain,dialog,shell}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {createLocalApi,createLocalSetup,MODELS}=require('./local-model.cjs');
 const {createWindowsRuntime}=require('./local-runtime.cjs');
 const {createOpenClaw}=require('./openclaw-native.cjs');
 const llama=require('./llama-runtime.cjs');
 const preflight=require('./preflight.cjs');
-module.exports=function register(getWindow,onSelected,onReady=()=>{}) {
+module.exports=function register(getWindow,onSelected,onReady=()=>{},chatBusy=()=>false) {
   let manager,openclaw,engine=null,hardware=null;
   const development=!app.isPackaged&&process.argv.includes('--rennie-dev');
   // The llama.cpp engine and its models live outside the roaming profile: they are large and belong to this PC.
@@ -13,6 +13,16 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{}) {
   // The largest NVIDIA GPU decides the recommended model. Detected once per run.
   const recommendation=()=>hardware||(hardware=llama.detect().then(found=>llama.choose(found)).catch(()=>null));
   const claw=()=>{if(development)throw Error('Isolated development tests use direct model chat. OpenClaw operations are disabled to protect the installed assistant.');return openclaw||(openclaw=createOpenClaw({directory:path.join(app.getPath('userData'),'openclaw')}));};
+  let nativeSkills;
+  const skillManager=()=>{const native=claw();if(!native.configured())throw Error('Set up your OpenClaw assistant before enabling skills.');return nativeSkills||(nativeSkills=require('./native-skills.cjs').createNativeSkills({claw:native}));};
+  const idle=()=>{if(chatBusy()||manager?.get().busy)throw Error('Wait for the current reply or setup to finish before changing skills.');};
+  ipcMain.handle('skills-status',()=>skillManager().status());
+  ipcMain.handle('skills-prepare',(_,choice)=>{idle();if(typeof choice?.search!=='boolean')throw Error('Choose whether to enable web search.');return skillManager().prepare(choice);});
+  ipcMain.handle('skills-toggle',(_,choice)=>{idle();return skillManager().toggle(choice?.name,choice?.enabled);});
+  ipcMain.handle('skills-search-off',()=>{idle();return skillManager().setSearch(false);});
+  ipcMain.handle('skills-restart',async()=>{idle();const m=skillManager();await claw().restartGateway({required:true});await claw().startGateway();return m.status();});
+  ipcMain.handle('skills-folder',async()=>{const dir=await skillManager().workspace();fs.mkdirSync(dir,{recursive:true});return shell.openPath(dir);});
+  ipcMain.handle('skills-add-files',async()=>{idle();const m=skillManager();const result=await dialog.showOpenDialog(getWindow(),{title:'Add files to your assistant workspace',properties:['openFile','multiSelections'],filters:[{name:'Text documents',extensions:['txt','md','csv','json']}]});return result.canceled?[]:m.addFiles(result.filePaths);});
   // Ollama stores models under OLLAMA_MODELS or %USERPROFILE%\.ollama; its runtime, OpenClaw and downloads use the profile drive.
   const free=dir=>{try{const s=fs.statfsSync(dir);return s.bavail*s.bsize;}catch{return NaN;}};
   const drive=dir=>path.parse(path.resolve(dir)).root.toLowerCase();
