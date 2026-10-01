@@ -6,7 +6,7 @@ The sandbox reached the first OpenClaw reply on a CPU runner but hit the old fiv
 
 Local validation: 114 unit tests passed. A new real sandbox run is still required; the longer timeout is not yet proof that the full acceptance procedure passes. The existing sign-in-entry migration fix also needs the upgrade job to complete. Background OpenClaw prompt warm-up, repeated direct checks on reopen, and a real Windows restart remain follow-up work. Do not credit those from this change.
 
-This is the acceptance test for issue #5 on a PC with no NVIDIA GPU. Each beta criterion ([docs/beta-criteria.md](docs/beta-criteria.md)) is credited only when the parts listed for it have been run and passed. If a part is skipped, report its criterion as untested.
+This is the acceptance test for issue #5 on a PC with no NVIDIA GPU. Each beta criterion ([docs/beta-criteria.md](../beta-criteria.md)) is credited only when the parts listed for it have been run and passed. If a part is skipped, report its criterion as untested.
 
 | Criterion | Credited when these pass |
 |---|---|
@@ -16,7 +16,7 @@ This is the acceptance test for issue #5 on a PC with no NVIDIA GPU. Each beta c
 
 This test does not cover signing (criterion 1) or the NVIDIA half of criterion 2.
 
-**The owner has chosen to use the Lenovo as a development PC**, with Smart App Control off for unsigned development builds. See [development setup](docs/development.md) (DEVELOPMENT.md in the artifact). No signing account is needed. Don't present that setting as a requirement for customers.
+**The owner has chosen to use the Lenovo as a development PC**, with Smart App Control off for unsigned development builds. See [development setup](../development.md) (DEVELOPMENT.md in the artifact). No signing account is needed. Don't present that setting as a requirement for customers.
 
 ## What this build does
 
@@ -29,7 +29,7 @@ Rennie was previously Foxsocket; this is the first build series from this reposi
 - **Uninstall** removes the sign-in task, Rennie's running server and the engine folder. OpenClaw stays, because it's a separate program. **An upgrade** keeps the engine and model.
 - **Other behavior.** Downloads resume after a stall with no time limit. Disk space is checked before anything downloads. A failed save of a chat message no longer locks chat. OpenClaw doctor and repair are on the setup page.
 
-Full records: [docs/engine-plan.md](docs/engine-plan.md) and [docs/openclaw-backbone.md](docs/openclaw-backbone.md).
+Full records: [docs/engine-plan.md](../engine-plan.md) and [docs/openclaw-backbone.md](../openclaw-backbone.md).
 
 ## Before you start
 

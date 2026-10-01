@@ -1,6 +1,6 @@
 # Alpha.6 response to Lenovo alpha.5 testing
 
-**Subsequent Lenovo result: blocked before launch.** The matching unsigned alpha.6 installer was rejected by Windows Application Control. The local results below do not establish Lenovo acceptance. [Signing pipeline fix and remaining publisher setup](../windows-signing.md); [current handoff](../../LENOVO-START-HERE.md).
+**Subsequent Lenovo result: blocked before launch.** The matching unsigned alpha.6 installer was rejected by Windows Application Control. The local results below do not establish Lenovo acceptance. [Signing pipeline fix and remaining publisher setup](../windows-signing.md); [current handoff](LENOVO-START-HERE.md).
 
 The alpha.5 report is on PR #33 (comment 5798811090). This follow-up addresses the three reported issues without changing the working Sparky profile.
 

@@ -44,7 +44,7 @@ jobs:
         run: pnpm exec electron chat-persist-smoke.cjs
       - name: Check isolated development launch
         run: pnpm exec electron . --foxsocket-dev --fresh --dev-smoke
-      - name: Check setup progress at Lenovo window size
+      - name: Check setup progress at a small laptop window size
         run: pnpm exec electron setup-progress-smoke.cjs
       - name: Check the full setup flow through OpenClaw (stand-ins, nothing installed)
         run: pnpm exec electron local-smoke.cjs
@@ -87,7 +87,7 @@ jobs:
             purpose = 'Unsigned development build; requires an owner-configured development PC'
             run_url = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
           } | ConvertTo-Json | Set-Content dev-installer/BUILD-INFO.json
-          Copy-Item LENOVO-START-HERE.md dev-installer
+          Copy-Item docs/testing.md dev-installer/TESTING.md
           Copy-Item docs/development.md dev-installer/DEVELOPMENT.md
       - uses: actions/upload-artifact@v4
         with:
