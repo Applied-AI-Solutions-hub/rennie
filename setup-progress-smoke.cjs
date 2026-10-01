@@ -29,7 +29,10 @@ app.whenReady().then(async()=>{
   win.webContents.send('local-progress',{...progress,busy:false,phase:'attention',error:'Network interrupted'});await wait(70);
   const terminal=await win.webContents.executeJavaScript(`!document.querySelector('[data-action=prepare-local]').disabled && document.querySelector('#local-setup-progress').textContent.includes('Network interrupted')`);
   if(!terminal)throw Error('Error/retry state did not render');
-  fs.writeFileSync(path.join(qa,'setup-progress.png'),(await win.webContents.capturePage()).toPNG());
+  // The picture is for people to look at, not a check. Electron 44 occasionally fails a capture with
+  // UnknownVizError (1 of 3 local runs), so try once more after a moment.
+  const picture=await win.webContents.capturePage().catch(()=>new Promise(r=>setTimeout(r,500)).then(()=>win.webContents.capturePage()));
+  fs.writeFileSync(path.join(qa,'setup-progress.png'),picture.toPNG());
   console.log('Setup progress: initial visibility, scroll, focus, details, and error/retry passed at 1268x666.');app.exit(0);
  }catch(error){console.error(error);app.exit(1);}
 });

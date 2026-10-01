@@ -4,7 +4,7 @@ const qa=path.join(__dirname,'.qa');fs.mkdirSync(qa,{recursive:true});
 app.setPath('userData',path.join(qa,'design-'+Date.now()));
 net.fetch=async()=>{throw Error('Offline design fixture');};
 const errors=[];
-app.on('web-contents-created',(_,wc)=>wc.on('console-message',(_,level,message)=>{if(level>=3)errors.push(message);}));
+app.on('web-contents-created',(_,wc)=>wc.on('console-message',({level,message})=>{if(level==='error')errors.push(message);}));
 require('./main');
 for(const name of ['gateway','metrics','setup-check','providers-get'])ipcMain.removeHandler(name);
 ipcMain.handle('gateway',()=>({ok:true,provider:'local',model:'llama3.2:1b'}));

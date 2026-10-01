@@ -63,7 +63,8 @@ module.exports = function register({ getState, persist, isBusy, run }) {
       const inventory = await setup.inspect();
       if (!inventory.wsl?.distributions.some(d => d.name === choice.distro)) throw Error('Install and initialize Ubuntu first, then check this PC again.');
     }
-    clipboard.writeText(command);
+    // Electron 44: clipboard writes are asynchronous; wait so the command is there before the terminal opens.
+    await clipboard.writeText(command);
     if (choice.copyOnly) return { copied: true };
     // The user's click opens an interactive terminal. They paste the displayed command.
     let child;
