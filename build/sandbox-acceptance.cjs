@@ -92,8 +92,8 @@ async function waitForSetup(c,timeoutMs){
   return {state:last,phases,seconds:Math.round((Date.now()-began)/1000)};
 }
 async function ask(c,text){
-  // Leave room beyond OpenClaw's 15-minute reply budget and its CLI shutdown grace.
-  const [result,seconds]=await timed(async()=>{try{const state=await c.invoke('chat',text,17*60000);const last=state.chat.at(-1);return {ok:last?.role==='assistant',text:String(last?.text||''),provider:last?.provider};}catch(error){if(error.requestPending)throw error;return {ok:false,error:error.message};}});
+  // Leave room beyond OpenClaw's 30-minute reply budget and its CLI shutdown grace.
+  const [result,seconds]=await timed(async()=>{try{const state=await c.invoke('chat',text,32*60000);const last=state.chat.at(-1);return {ok:last?.role==='assistant',text:String(last?.text||''),provider:last?.provider};}catch(error){if(error.requestPending)throw error;return {ok:false,error:error.message};}});
   return {...result,seconds};
 }
 // Rennie's own server only: llama-server.exe running from its engine folder.
@@ -180,7 +180,7 @@ async function full(installer){
   r=await ask(c,'Reply with only the word blue.');
   record('20a','Server stopped: what Rennie says','info',r.ok?`unexpectedly replied: "${r.text.slice(0,80)}"`:`"${String(r.error).slice(0,200)}"`,false);
   const gw=await c.invoke('gateway').catch(e=>({error:e.message}));record('20b','Status while the server is down','info',JSON.stringify({ok:gw.ok,error:gw.error||gw.message}).slice(0,200),false);
-  await c.invoke('local-prepare',{model:MODEL});let again=await waitForSetup(c,20*60000);
+  await c.invoke('local-prepare',{model:MODEL});let again=await waitForSetup(c,35*60000);
   r=await ask(c,'Reply with only the word blue.');
   check('20c','Resume setup brings replies back',again.state?.phase==='ready'&&r.ok,`setup ended ${again.state?.phase||"unknown"}${again.state?.failedPhase?" at "+again.state.failedPhase:""} after ${again.seconds} s (phases: ${again.phases.join(" → ")})${again.state?.error?"; setup said: "+String(again.state.error).slice(0,160):""}; then ${r.ok?`replied "${r.text.slice(0,40)}"`:"no reply: "+String(r.error).slice(0,120)}`,true,again.seconds);
   const clawCmd=await ps("$env:Path=[Environment]::GetEnvironmentVariable('Path','User')+';'+[Environment]::GetEnvironmentVariable('Path','Machine');(Get-Command openclaw.cmd -ErrorAction SilentlyContinue).Source");
@@ -192,7 +192,7 @@ async function full(installer){
   record('21c','OpenClaw doctor','info',doctor.error||`ok ${doctor.ok}; ${doctor.findings?.length??0} finding(s): ${(doctor.findings||[]).slice(0,3).map(f=>f.checkId).join(', ')}`,false);
   const repair=await c.invoke('openclaw-repair',undefined,15*60000).catch(e=>({error:e.message}));
   r=await ask(c,'Reply with only the word blue.');
-  if(!r.ok){await c.invoke('local-prepare',{model:MODEL});await waitForSetup(c,20*60000);r=await ask(c,'Reply with only the word blue.');}
+  if(!r.ok){await c.invoke('local-prepare',{model:MODEL});await waitForSetup(c,35*60000);r=await ask(c,'Reply with only the word blue.');}
   check('21d','Repair (or Resume setup) brings replies back',r.ok,`repair ${repair.error||'ran, ok '+repair.ok}; ${r.ok?`"${r.text.slice(0,40)}"`:r.error}`,true,r.seconds);
 
   part('F');
