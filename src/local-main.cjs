@@ -12,7 +12,7 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{},chatBusy=()
   const engineDir=()=>development?path.join(app.getPath('userData'),'engine'):path.join(process.env.LOCALAPPDATA||app.getPath('userData'),'Rennie','engine');
   // The largest NVIDIA GPU decides the recommended model. Detected once per run.
   const recommendation=()=>hardware||(hardware=llama.detect().then(found=>llama.choose(found)).catch(()=>null));
-  const claw=()=>{if(development)throw Error('Isolated development tests use direct model chat. OpenClaw operations are disabled to protect the installed assistant.');return openclaw||(openclaw=createOpenClaw({directory:path.join(app.getPath('userData'),'openclaw')}));};
+  const claw=()=>openclaw||(openclaw=development?require('./dev-openclaw.cjs').createDevOpenClaw({directory:path.join(app.getPath('userData'),'native-openclaw'),getTarget:()=>{if(!engine)throw Error('Set up the local engine first.');return engine.target(manager?.get().model||'qwen3.5-9b');}}):createOpenClaw({directory:path.join(app.getPath('userData'),'openclaw')}));
   let nativeSkills;
   const skillManager=()=>{const native=claw();if(!native.configured())throw Error('Set up your OpenClaw assistant before enabling skills.');return nativeSkills||(nativeSkills=require('./native-skills.cjs').createNativeSkills({claw:native}));};
   const idle=()=>{if(chatBusy()||manager?.get().busy)throw Error('Wait for the current reply or setup to finish before changing skills.');};
@@ -45,7 +45,7 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{},chatBusy=()
       if(saved&&!llama.MODELS.some(m=>m.id===saved.model))saved={agentName:saved.agentName||null};
     }
     const api=createLocalApi();
-    manager=createLocalSetup({api,platform:createWindowsRuntime({directory:path.join(app.getPath('userData'),'installers'),api}),engine,defaultModel:engine?llama.MODELS.at(-1).id:undefined,openclaw:process.platform==='win32'&&!development?claw():null,onReady,checkSpace:assess,
+    manager=createLocalSetup({api,platform:createWindowsRuntime({directory:path.join(app.getPath('userData'),'installers'),api}),engine,defaultModel:engine?llama.MODELS.at(-1).id:undefined,openclaw:process.platform==='win32'?claw():null,onReady,checkSpace:assess,
       read:()=>saved,
       write:value=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(value,null,2));fs.renameSync(file+'.tmp',file);},
       onChange:value=>{const window=getWindow();if(window&&!window.isDestroyed())window.webContents.send('local-progress',snapshot(value));}
@@ -82,6 +82,7 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{},chatBusy=()
   const confirmExit=event=>{if(manager?.get().busy){event.preventDefault();const options={type:'question',buttons:['Keep setting up','Exit and resume later'],defaultId:0,cancelId:0,message:'Local setup is still running.',detail:'You can resume setup after reopening Rennie. Downloaded parts are kept.'};const window=getWindow();const choice=window&&!window.isDestroyed()?dialog.showMessageBoxSync(window,options):dialog.showMessageBoxSync(options);if(choice===1)app.exit(0);else if(window&&!window.isDestroyed()){window.show();window.focus();}}};
   app.on('browser-window-created',(_,window)=>window.on('close',confirmExit));
   app.on('before-quit',confirmExit);
+  app.on('will-quit',()=>{if(development)openclaw?.dispose?.();});
   // Model information pages come from the pinned catalog, never from the page asking.
   const license=id=>{get();const model=engine&&llama.MODELS.find(m=>m.id===id);return model?'https://huggingface.co/'+model.repo:'https://ollama.com/library/llama3.2';};
   // Direct chat with the llama.cpp server, used before OpenClaw has confirmed a reply.

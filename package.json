@@ -41,6 +41,7 @@
       "src/**/*",
       "!src/ui-effects.js",
       "!src/dev-main.cjs",
+      "!src/dev-openclaw.cjs",
       "!src/dev-agent-tools.cjs",
       "!src/dev-tools-plugin/**/*",
       "docs/fresh-pc-setup.md",

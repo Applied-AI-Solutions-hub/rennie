@@ -5,7 +5,8 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const qa = path.join(root, '.qa');
 fs.mkdirSync(qa, { recursive: true });
-const profile = process.argv.includes('--fresh')
+const requested=process.argv.indexOf('--dev-profile');
+const profile = requested>=0 ? path.resolve(process.argv[requested+1]) : process.argv.includes('--fresh')
   ? fs.mkdtempSync(path.join(qa, 'dev-fresh-'))
   : path.join(qa, 'dev-profile');
 fs.mkdirSync(profile, { recursive: true });
@@ -13,7 +14,7 @@ app.setPath('userData', profile);
 app.on('browser-window-created',(_,window)=>window.webContents.on('did-finish-load',()=>window.setTitle('Rennie — Development test')));
 process.chdir(root);
 console.log(`Rennie development profile: ${profile}`);
-console.log('Isolated model engine; no sign-in task registration. Direct model chat only; installed OpenClaw operations are disabled.');
+console.log('Isolated model engine; no sign-in task registration. Native OpenClaw gateway uses its own profile and port.');
 if (process.argv.includes('--dev-smoke')) {
   const { BrowserWindow } = require('electron');
   app.whenReady().then(async () => {
