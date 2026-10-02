@@ -41,7 +41,7 @@ const localSetup=require('./local-main.cjs')(()=>win,model=>{
  workspace.connect(state,{backbone:'openclaw',agentId:ready.agentId||'main',agentName});
  state.setup=setup.update(state.setup,{role:'host',step:'conversation',...(agentName?{agentName}:{})});persist();
  if(win&&!win.isDestroyed())win.webContents.send('state',state);
-});
+},()=>busy);
 const run=(exe,args,timeout=15000)=>new Promise((resolve,reject)=>execFile(exe,args,{windowsHide:true,timeout,maxBuffer:8*1024*1024,encoding:'utf8'},(e,out)=>e?reject(new Error(e.killed?'Operation timed out.':'The command failed. Check the gateway setup and try again.')):resolve(out)));
 const claw=(args,timeout)=>run('wsl.exe',clawArgs(state?.connection?.distro||'Ubuntu-24.04',args),timeout);
 const parse=(s)=>{let start=s.indexOf('{');if(start<0)throw Error('Gateway returned no JSON response');return JSON.parse(s.slice(start));};
@@ -88,3 +88,5 @@ const history=state.chat.filter(m=>m.role==='user'||m.role==='assistant').slice(
 
 
 
+
+ipcMain.handle('chat-stop',async()=>{if(!busy)return {aborted:false};if(!route(providerStore.load(providersFile())).agent)throw Error('This conversation does not use the OpenClaw agent.');return localSetup.openclaw().cancelChat(state.session);});

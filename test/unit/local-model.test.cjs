@@ -218,6 +218,23 @@ test('engine status reports a stopped server or a missing model instead of ready
  const missing=llamaFixture({built:true,downloaded:false});
  assert.match((await missing.make().status('qwen3.5-4b')).error,/not downloaded/);
 });
+test('quiet reopen retains a saved backend and legacy setups do not switch automatically',async()=>{
+ for(const build of [undefined,'cpu','cuda']){
+  const f=llamaFixture({built:true,downloaded:true,configured:true});const selected=[];
+  f.engine.configure=async(id,options)=>{selected.push(options);return {build:options?.build||'cuda'};};
+  const manager=f.make({phase:'ready',model:'qwen3.5-4b',engine:'llama',...(build?{build}:{})});
+  await manager.status('qwen3.5-4b');
+  assert.deepEqual(selected,build?[{build}]:[]);
+  assert.ok(!f.calls.some(c=>c.startsWith('install:')||c.startsWith('schedule:')));
+ }
+});
+
+test('explicit setup resolves a backend before download preflight and saves its choice',async()=>{
+ const f=llamaFixture({built:true,downloaded:true,configured:true});
+ f.engine.configure=async()=>{f.calls.push('configure');return {build:'cuda',reason:'Using test GPU'};};
+ const result=await f.make().prepare('qwen3.5-4b');
+ assert.equal(f.calls[0],'configure');assert.equal(result.build,'cuda');assert.equal(result.backendReason,'Using test GPU');
+});
 test('a failed reply check stops setup at that step with the engine’s own explanation',async()=>{
  const f=llamaFixture({verifyFails:'The local model is installed and running, but it answered the basic arithmetic check incorrectly.'});
  const result=await f.make().prepare('qwen3.5-4b');
