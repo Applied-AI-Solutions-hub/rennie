@@ -9,6 +9,8 @@ function requestedFiles(message){
  // Match the output immediately after the verb, or after "as" / "to".
  const output=/\b(?:save|create|write|export|edit|update)\s+(?:(?:a|the)\s+)?["`']?([\w.-]+(?:\/[\w.-]+)*\.(?:txt|md|csv|json))\b|\b(?:save|create|write|export)\b[^\n!?]*?\b(?:as|to)\s+["`']?([\w.-]+(?:\/[\w.-]+)*\.(?:txt|md|csv|json))\b/gi;
  for(const match of message.matchAll(output)){const prefix=message.slice(0,match.index);if(!/(?:^|[.!?;]\s*|\bthen\s+|\bto\s+|\bplease\s+|\bcan you\s+|\bcould you\s+)$/i.test(prefix))continue;const name=match[1]||match[2];if(!name.split('/').includes('..')&&!names.includes(name))names.push(name);}
+ const edit=/^(?:please\s+)?in\s+["`']?([\w.-]+(?:\/[\w.-]+)*\.(?:txt|md|csv|json))["`']?,?\s+(?:change|replace|update)\b/i.exec(message);
+ if(edit&&!edit[1].split('/').includes('..')&&!names.includes(edit[1]))names.push(edit[1]);
  return names.slice(0,16).map(file=>({file}));
 }
 function capture(root,expected){
