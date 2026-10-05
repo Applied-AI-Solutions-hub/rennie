@@ -4,11 +4,11 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 // request. This is not a semantic judge of arbitrary assistant claims.
 function requestedFiles(message){
  // Negated, conditional and quoted instructions are not action contracts.
- if(/\b(?:if|unless|hypothetical|example|quote)\b/i.test(message)||/[“”]/.test(message))return [];
+ if(/\b(?:if|unless|hypothetical|example|quote)\b/i.test(message)||/[“”]|```/.test(message))return [];
  const names=[];
  // Match the output immediately after the verb, or after "as" / "to".
  const output=/\b(?:save|create|write|export|edit|update)\s+(?:(?:a|the)\s+)?["`']?([\w.-]+(?:\/[\w.-]+)*\.(?:txt|md|csv|json))\b|\b(?:save|create|write|export)\b[^\n!?]*?\b(?:as|to)\s+["`']?([\w.-]+(?:\/[\w.-]+)*\.(?:txt|md|csv|json))\b/gi;
- for(const match of message.matchAll(output)){if(/\b(?:not|never|don't)\s*$/i.test(message.slice(0,match.index)))continue;const name=match[1]||match[2];if(!name.split('/').includes('..')&&!names.includes(name))names.push(name);}
+ for(const match of message.matchAll(output)){const prefix=message.slice(0,match.index);if(!/(?:^|[.!?;]\s*|\bthen\s+|\bto\s+|\bplease\s+|\bcan you\s+|\bcould you\s+)$/i.test(prefix))continue;const name=match[1]||match[2];if(!name.split('/').includes('..')&&!names.includes(name))names.push(name);}
  return names.slice(0,16).map(file=>({file}));
 }
 function capture(root,expected){

@@ -6,6 +6,8 @@ test('explicit outputs are distinguished from input files and ordinary conversat
  assert.deepEqual(requestedFiles('Summarize notes.txt. What did you save yesterday?'),[]);
  assert.deepEqual(requestedFiles('Do not create summary.txt.'),[]);
  assert.deepEqual(requestedFiles('If needed, create summary.txt.'),[]);
+ assert.deepEqual(requestedFiles('Why did you create summary.txt?'),[]);
+ assert.deepEqual(requestedFiles('Create summary.txt. Do not invent facts.'),[{file:'summary.txt'}]);
 });
 test('a missing, stale, empty or wrong-content file cannot satisfy an exact output contract',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rennie-evidence-'));
