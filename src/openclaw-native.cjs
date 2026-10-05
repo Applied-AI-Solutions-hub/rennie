@@ -285,9 +285,10 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     // then materializes an exact, content-addressed copy outside the archive.
     const helper=require('./external-helper.cjs').materialize(directory,'openclaw-cancel.mjs');
     const operation=(async()=>{
-      for(let attempt=0;attempt<20;attempt++){
+      const stopDeadline=now()+30000;
+      for(let attempt=0;attempt<20&&now()<stopDeadline;attempt++){
         if(request?.finished)return {aborted:true,completed:true};
-        const r=await run(located.node,[helper,located.entry,session],{env:located.env,timeout:30000});
+        const r=await run(located.node,[helper,located.entry,session],{env:located.env,timeout:Math.max(1,stopDeadline-now())});
         if(r.code!==0)throw Error('OpenClaw could not confirm cancellation.');
         const result=json(r.stdout);
         if(result.aborted===true)return result;

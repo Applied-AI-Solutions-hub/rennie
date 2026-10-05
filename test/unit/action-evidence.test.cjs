@@ -13,7 +13,7 @@ test('a missing, stale, empty or wrong-content file cannot satisfy an exact outp
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rennie-evidence-'));
  fs.writeFileSync(path.join(root,'existing.txt'),'old');
  const verify=capture(root,[{file:'new.txt',exactText:'Blue'},{file:'existing.txt',includes:['new']}]);
- assert.ok(verify().every(x=>!x.ok));fs.writeFileSync(path.join(root,'new.txt'),'Exactly Blue');assert.equal(verify()[0].ok,false);
+ assert.ok(verify().every(x=>!x.ok));fs.writeFileSync(path.join(root,'new.txt'),'');assert.equal(verify()[0].ok,false);fs.writeFileSync(path.join(root,'new.txt'),'Exactly Blue');assert.equal(verify()[0].ok,false);
  fs.writeFileSync(path.join(root,'new.txt'),'Blue');fs.writeFileSync(path.join(root,'existing.txt'),'new');assert.ok(verify().every(x=>x.ok));
 });
 test('file evidence refuses traversal and junctions outside the workspace',()=>{

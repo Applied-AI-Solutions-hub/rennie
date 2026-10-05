@@ -25,7 +25,7 @@ function capture(root,expected){
  const items=expected.map(item=>({...item,before:inspect(item.file)}));
  return ()=>items.map(item=>{
   const after=inspect(item.file),changed=!!after&&(!item.before||after.hash!==item.before.hash||after.mtimeMs!==item.before.mtimeMs);
-  const contentMatches=!!after&&(!Object.hasOwn(item,'exactText')||after.text===item.exactText)&&(item.includes||[]).every(text=>after.text.includes(text));
+  const contentMatches=!!after&&(after.bytes>0||item.exactText==='')&&(!Object.hasOwn(item,'exactText')||after.text===item.exactText)&&(item.includes||[]).every(text=>after.text.includes(text));
   return {file:item.file,ok:changed&&contentMatches,exists:!!after,changed,contentMatches,bytes:after?.bytes||0,sha256:after?.hash||null};
  });
 }
