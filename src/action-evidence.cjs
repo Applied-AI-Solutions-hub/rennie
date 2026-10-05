@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 // request. This is not a semantic judge of arbitrary assistant claims.
 function requestedFiles(message){
  // Negated, conditional and quoted instructions are not action contracts.
- if(/\b(?:if|unless|hypothetical|example|quote)\b/i.test(message)||/[“”]|```/.test(message))return [];
+ if(/\b(?:if|unless|hypothetical|example|quote)\b/i.test(message)||/[\u201C\u201D\u2018\u2019]|```/.test(message))return [];
  const names=[];
  // Match the output immediately after the verb, or after "as" / "to".
  const output=/\b(?:save|create|write|export|edit|update)\s+(?:(?:a|the)\s+)?["`']?([\w.-]+(?:\/[\w.-]+)*\.(?:txt|md|csv|json))\b|\b(?:save|create|write|export)\b[^\n!?]*?\b(?:as|to)\s+["`']?([\w.-]+(?:\/[\w.-]+)*\.(?:txt|md|csv|json))\b/gi;

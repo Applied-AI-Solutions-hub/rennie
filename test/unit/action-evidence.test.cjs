@@ -9,6 +9,7 @@ test('explicit outputs are distinguished from input files and ordinary conversat
  assert.deepEqual(requestedFiles('Why did you create summary.txt?'),[]);
  assert.deepEqual(requestedFiles('In launch-brief.md, change the heading to Internal launch review.'),[{file:'launch-brief.md'}]);
  assert.deepEqual(requestedFiles('Create summary.txt. Do not invent facts.'),[{file:'summary.txt'}]);
+ for(const quote of ['\u201C','\u201D','\u2018','\u2019'])assert.deepEqual(requestedFiles('Create summary.txt '+quote+'as an example'),[]);
 });
 test('a missing, stale, empty or wrong-content file cannot satisfy an exact output contract',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rennie-evidence-'));

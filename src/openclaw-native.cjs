@@ -222,11 +222,24 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
       // Sandbox runs (2026-09-30): about half the time OpenClaw's first request after it starts reached the
       // llama.cpp server without the key it had saved (HTTP 401), while a later request worked. OpenClaw's own
       // message says to try again in a moment, so a 401 is retried once after a short wait.
-      const expectedRoot=expected.length?(await skills(session.split(':')[1])).workspaceDir:null;
-      if(expected.length)verify=evidence.capture(expectedRoot,expected);
+      let expectedRoot=null,verificationUnavailable=false;
+      if(expected.length){
+        try{
+          const root=(await skills(session.split(':')[1])).workspaceDir;
+          if(typeof root!=='string'||!root.trim())throw Error('Workspace unavailable.');
+          expectedRoot=fs.realpathSync(root);
+          if(!fs.statSync(expectedRoot).isDirectory())throw Error('Workspace unavailable.');
+        }catch{
+          // Explicit callers require a contract, even when discovery fails.
+          if(expectedFiles)throw Error('The requested file action could not be verified because the workspace is unavailable.');
+          verificationUnavailable=true;
+        }
+        // Path/contract errors must not silently bypass verification.
+        if(expectedRoot&&!verificationUnavailable)verify=evidence.capture(expectedRoot,expected);
+      }
       const checked=async()=>{
         let reply=await ask();
-        if(!verify)return reply;
+        if(!verify)return verificationUnavailable?{...reply,content:'Rennie could not check the requested files because the workspace is unavailable. Any file-action claims below are unverified.\n\n'+reply.content,evidence:{kind:'workspace-files',status:'unavailable',files:[]}}:reply;
         let files=verify();
         if(files.some(item=>!item.ok)){
           if(request.stopping)throw Error('Reply stopped.');

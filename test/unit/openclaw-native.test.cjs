@@ -217,6 +217,23 @@ test('a false write claim is withheld after one native recovery attempt',async()
  let asks=0;const f=fake(l,{'skills list':{code:0,stdout:JSON.stringify({workspaceDir:workspace})},'agent --session-key':()=>{asks++;return {code:0,stdout:JSON.stringify({final:'Done, I saved report.txt.'})};}});
  await assert.rejects(f.claw.chat({message:'Create report.txt with Blue.',session:'agent:main:evidence'}),/could not be verified/);assert.equal(asks,2);assert.equal(fs.existsSync(path.join(workspace,'report.txt')),false);
 });
+test('unavailable workspace discovery preserves the reply with an explicit unverified notice',async()=>{
+ const cases=[{code:1,stdout:''},{code:0,stdout:'{}'},{code:0,stdout:JSON.stringify({workspaceDir:'Z:/rennie-missing-workspace'})}];
+ for(const result of cases){
+  let asks=0;const f=fake(layout(),{'skills list':result,'agent --session-key':()=>{asks++;return {code:0,stdout:'{"final":"Saved report.txt."}'};}});
+  const r=await f.claw.chat({message:'Create report.txt.',session:'agent:main:unavailable'});
+  assert.equal(asks,1);assert.match(r.content,/^Rennie could not check/);assert.match(r.content,/claims below are unverified/);assert.match(r.content,/Saved report.txt/);assert.equal(r.evidence.status,'unavailable');assert.deepEqual(r.evidence.files,[]);
+ }
+});
+test('explicit file contracts fail closed when discovery fails and unsafe paths do not degrade',async()=>{
+ const l=layout(),workspace=path.join(l.root,'workspace');fs.mkdirSync(workspace);let asks=0;
+ const handlers={'skills list':{code:1,stdout:''},'agent --session-key':()=>{asks++;return {code:0,stdout:'{"final":"Done"}'};}};
+ const f=fake(l,handlers);
+ await assert.rejects(f.claw.chat({message:'Create report.txt.',session:'agent:main:contract',expectedFiles:[{file:'report.txt'}]}),/workspace is unavailable/);
+ handlers['skills list']={code:0,stdout:JSON.stringify({workspaceDir:workspace})};
+ await assert.rejects(f.claw.chat({message:'Create report.txt.',session:'agent:main:contract',expectedFiles:[{file:'../report.txt'}]}),/relative workspace path/);
+ assert.equal(asks,0);
+});
 test('native recovery can create the actual requested file and return a disk receipt',async()=>{
  const l=layout(),workspace=path.join(l.root,'workspace');fs.mkdirSync(workspace);let asks=0;
  const f=fake(l,{'skills list':{code:0,stdout:JSON.stringify({workspaceDir:workspace})},'agent --session-key':()=>{if(++asks===2)fs.writeFileSync(path.join(workspace,'report.txt'),'Blue');return {code:0,stdout:JSON.stringify({final:'Saved report.txt.'})};}});
