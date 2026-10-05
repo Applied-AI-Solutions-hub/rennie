@@ -36,3 +36,8 @@ test('file import copies supported files with unique names and leaves originals 
  const [name]=await f.manager.addFiles([file]);assert.notEqual(name,'input.txt');assert.equal(fs.readFileSync(path.join(f.root,name),'utf8'),'original');assert.equal(fs.readFileSync(file,'utf8'),'original');
  const exe=path.join(f.root,'bad.exe');fs.writeFileSync(exe,'bad');await assert.rejects(f.manager.addFiles([exe]),/Choose text/);
 });
+
+test('starter installation changes the connected agent policy and workspace',async t=>{
+ const f=fixture(t),seen=[];const list=f.claw.skills;f.claw.skills=async agent=>{seen.push(agent);return list();};
+ const manager=createNativeSkills({claw:f.claw,getAgent:()=> 'writer'});await manager.prepare();assert.equal(f.patches[0].agents.entries.main,undefined);assert.ok(f.patches[0].agents.entries.writer.tools);assert.ok(seen.every(id=>id==='writer'));
+});

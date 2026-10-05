@@ -211,3 +211,25 @@ test('explicit restart never reports success when the native restart command fai
  const f=fake(layout(),{'gateway restart':{code:1,stdout:'',stderr:'service unavailable'}});
  await assert.rejects(f.claw.restartGateway({required:true}),/could not confirm the restart/);
 });
+
+test('a false write claim is withheld after one native recovery attempt',async()=>{
+ const l=layout(),workspace=path.join(l.root,'workspace');fs.mkdirSync(workspace);
+ let asks=0;const f=fake(l,{'skills list':{code:0,stdout:JSON.stringify({workspaceDir:workspace})},'agent --session-key':()=>{asks++;return {code:0,stdout:JSON.stringify({final:'Done, I saved report.txt.'})};}});
+ await assert.rejects(f.claw.chat({message:'Create report.txt with Blue.',session:'agent:main:evidence'}),/could not be verified/);assert.equal(asks,2);assert.equal(fs.existsSync(path.join(workspace,'report.txt')),false);
+});
+test('native recovery can create the actual requested file and return a disk receipt',async()=>{
+ const l=layout(),workspace=path.join(l.root,'workspace');fs.mkdirSync(workspace);let asks=0;
+ const f=fake(l,{'skills list':{code:0,stdout:JSON.stringify({workspaceDir:workspace})},'agent --session-key':()=>{if(++asks===2)fs.writeFileSync(path.join(workspace,'report.txt'),'Blue');return {code:0,stdout:JSON.stringify({final:'Saved report.txt.'})};}});
+ const r=await f.claw.chat({message:'Create report.txt with Blue.',session:'agent:main:evidence',expectedFiles:[{file:'report.txt',exactText:'Blue'}]});assert.equal(asks,2);assert.equal(r.evidence.files[0].ok,true);
+});
+test('Stop retries when the gateway has not registered the active run yet',async()=>{
+ let finish,entered;const started=new Promise(r=>entered=r);let aborts=0;
+ const f=fake(layout(),{'agent --session-key':()=>{entered();return new Promise(r=>finish=r);},'agent:main:early':()=>{aborts++;if(aborts===3)finish({code:0,stdout:'{"final":"Late answer"}'});return {code:0,stdout:JSON.stringify({aborted:aborts===3})};}});
+ const chat=f.claw.chat({message:'Wait',session:'agent:main:early'});await started;assert.equal((await f.claw.cancelChat('agent:main:early')).aborted,true);await assert.rejects(chat,/Reply stopped/);assert.equal(aborts,3);
+});
+test('an unconfirmed abort is never reported as successful',async()=>{
+ const f=fake(layout(),{'agent:main:absent':{code:0,stdout:'{"aborted":false}'}});await assert.rejects(f.claw.cancelChat('agent:main:absent'),/did not confirm/);
+});
+test('skills commands use the selected agent',async()=>{
+ const f=fake(layout(),{'skills list':{code:0,stdout:'{}'},'skills info':{code:0,stdout:'{}'}});await f.claw.skills('writer');await f.claw.skillInfo('docs','writer');assert.ok(f.cliCalls().every(c=>c.args[c.args.indexOf('--agent')+1]==='writer'));
+});

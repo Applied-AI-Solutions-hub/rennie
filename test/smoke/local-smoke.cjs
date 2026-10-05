@@ -5,7 +5,7 @@ net.fetch=async()=>{throw Error('Offline update fixture');};
 let built=false,downloaded=false,running=false,attempts=0,verified=0,installs=0,scheduled=0;const targets=[];
 const llama=require('../../src/llama-runtime.cjs');
 llama.detect=async()=>({gpu:{name:'NVIDIA GeForce RTX 4070',videoMemory:12288*1024**2,driver:'560.94'},totalMemory:16*1024**3});
-llama.createLlamaRuntime=()=>({kind:'llama',models:llama.MODELS,
+llama.createLlamaRuntime=()=>({plan:async model=>llama.executionPlan(llama.MODELS.find(m=>m.id===model),await llama.detect()),configure:async model=>llama.executionPlan(llama.MODELS.find(m=>m.id===model),await llama.detect()),kind:'llama',models:llama.MODELS,
  // Sizes follow the model asked about, like the real engine, so the screen's estimate can be checked against the choice.
  needs:model=>{const m=llama.MODELS.find(x=>x.id===model),b=llama.BUILDS[m.build],buildBytes=b.archives.reduce((sum,a)=>sum+a.bytes,0);return {needsBuild:!built,needsModel:!downloaded,downloadBytes:(built?0:buildBytes)+(downloaded?0:m.bytes),modelBytes:m.bytes,buildBytes,unpackedBytes:b.unpackedBytes};},
  install:async(model,progress)=>{attempts++;if(!built)installs++;built=true;progress({phase:'downloading-model',message:'Downloading the model.',total:100,completed:50});await new Promise(r=>setTimeout(r,1500));if(attempts===1)throw Error('Test download interrupted');downloaded=true;},

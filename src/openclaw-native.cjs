@@ -192,7 +192,7 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
   // A cold CPU model can spend more than five minutes reading OpenClaw's
   // initial prompt. Apply the same bounded budget to setup and later chats:
   // the first request after a Windows restart is cold too.
-  async function chat({message,session,timeoutSeconds=1800}){
+  async function chat({message,session,timeoutSeconds=1800,expectedFiles}){
     if(typeof message!=='string'||!message.trim())throw Error('Enter a message.');
     if(!SESSION.test(String(session)))throw Error('This conversation has an invalid session. Start a new chat.');
     if(!Number.isFinite(timeoutSeconds)||timeoutSeconds<1)throw Error('Reply timeout must be at least one second.');
@@ -201,13 +201,17 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     fs.mkdirSync(path.join(directory,'messages'),{recursive:true});
     const file=path.join(directory,'messages',crypto.randomUUID()+'.txt');
     fs.writeFileSync(file,message,{encoding:'utf8',mode:0o600});
-    const request={cancel:null};activeChats.set(session,request);
+    const request={cancel:null,stopping:false,finished:false};activeChats.set(session,request);
+    let verify=null;
+    const evidence=require('./action-evidence.cjs');
+    const expected=expectedFiles??evidence.requestedFiles(message);
     const ask=async()=>{
       // A retry spends the remaining budget; it must not start a second full wait.
+      if(request.stopping)throw Error('Reply stopped.');
       const remaining=deadline-now(),seconds=Math.floor(remaining/1000);
       if(seconds<1)throw timeoutError();
       const r=await cli(['agent','--session-key',session,'--message-file',file,'--json','--timeout',String(seconds)],{timeout:remaining+60000});
-      if(request.cancel&&(await request.cancel.catch(()=>null))?.aborted)throw Error('Reply stopped.');
+      if(request.stopping)throw Error('Reply stopped.');
       if(r.timedOut)throw timeoutError();
       let result;try{result=json(r.stdout);}catch{throw Error(r.timedOut?'Your assistant did not reply in time.':'OpenClaw did not return a reply. Check that its gateway is running in This PC.');}
       const reply=readAgentReply(result);
@@ -218,9 +222,23 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
       // Sandbox runs (2026-09-30): about half the time OpenClaw's first request after it starts reached the
       // llama.cpp server without the key it had saved (HTTP 401), while a later request worked. OpenClaw's own
       // message says to try again in a moment, so a 401 is retried once after a short wait.
-      try{return await ask();}
-      catch(error){if(!/HTTP 401/.test(error.message))throw error;if(deadline-now()<=15000)throw timeoutError();keep(lastLog,'OpenClaw returned HTTP 401; trying the reply again once within the original reply deadline.',80);await wait(15000);return await ask();}
-    }catch(error){forgetGateway();throw error;}finally{if(activeChats.get(session)===request)activeChats.delete(session);fs.rmSync(file,{force:true});}
+      const expectedRoot=expected.length?(await skills(session.split(':')[1])).workspaceDir:null;
+      if(expected.length)verify=evidence.capture(expectedRoot,expected);
+      const checked=async()=>{
+        let reply=await ask();
+        if(!verify)return reply;
+        let files=verify();
+        if(files.some(item=>!item.ok)){
+          if(request.stopping)throw Error('Reply stopped.');
+          fs.writeFileSync(file,'Rennie checked the requested output files on disk. These files were not created or updated with the required content: '+files.filter(item=>!item.ok).map(item=>item.file).join(', ')+'. Finish the original request using your native tools, then read the outputs back. If you cannot finish, explain the failure. Do not claim that an unverified action succeeded. Original request: '+message,{encoding:'utf8'});
+          reply=await ask();files=verify();
+        }
+        if(files.some(item=>!item.ok))throw Error('The requested file action could not be verified: '+files.filter(item=>!item.ok).map(item=>item.file).join(', ')+'. Check the workspace before retrying; some files may have changed.');
+        return {...reply,evidence:{kind:'workspace-files',files}};
+      };
+      try{return await checked();}
+      catch(error){if(!/HTTP 401/.test(error.message))throw error;if(deadline-now()<=15000)throw timeoutError();keep(lastLog,'OpenClaw returned HTTP 401; trying the reply again once within the original reply deadline.',80);await wait(15000);return await checked();}
+    }catch(error){forgetGateway();throw error;}finally{request.finished=true;if(activeChats.get(session)===request)activeChats.delete(session);fs.rmSync(file,{force:true});}
   }
   async function doctor(){
     const r=await cli(['doctor','--json'],{timeout:180000});
@@ -242,13 +260,15 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     try{const r=await cli(['config','patch','--file',file],{timeout:120000});if(r.code!==0)throw Error('OpenClaw did not accept these settings. Existing settings were not replaced by Rennie.');}
     finally{fs.rmSync(file,{force:true});}
   }
-  async function skills(){
-    const r=await cli(['skills','list','--agent',AGENT,'--json']);
+  async function skills(agent=AGENT){
+    if(!/^[\w.-]{1,80}$/.test(agent))throw Error('Invalid agent.');
+    const r=await cli(['skills','list','--agent',agent,'--json']);
     if(r.code!==0)throw Error('OpenClaw could not list skills.');return json(r.stdout);
   }
-  async function skillInfo(name){
+  async function skillInfo(name,agent=AGENT){
+    if(!/^[\w.-]{1,80}$/.test(agent))throw Error('Invalid agent.');
     if(typeof name!=='string'||!name||name.length>150||name.startsWith('-'))throw Error('Invalid skill name.');
-    const r=await cli(['skills','info',name,'--agent',AGENT,'--json']);
+    const r=await cli(['skills','info',name,'--agent',agent,'--json']);
     if(r.code!==0)throw Error('OpenClaw could not inspect this skill.');return json(r.stdout);
   }
   async function installSearch(){
@@ -258,9 +278,25 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
   async function cancelChat(session){
     if(!SESSION.test(String(session)))throw Error('Invalid conversation.');
     if(!located&&!await locate())throw Error('OpenClaw is not installed.');
-    const operation=(async()=>{const r=await run(located.node,[path.join(__dirname,'openclaw-cancel.mjs'),located.entry,session],{env:located.env,timeout:30000});
-      if(r.code!==0)throw Error('OpenClaw could not confirm cancellation.');return json(r.stdout);})();
-    const request=activeChats.get(session);if(request)request.cancel=operation;
+    const request=activeChats.get(session);
+    if(request?.cancel)return request.cancel;
+    if(request)request.stopping=true;
+    // External Node cannot read app.asar. Electron reads the bundled helper,
+    // then materializes an exact, content-addressed copy outside the archive.
+    const helper=require('./external-helper.cjs').materialize(directory,'openclaw-cancel.mjs');
+    const operation=(async()=>{
+      for(let attempt=0;attempt<20;attempt++){
+        if(request?.finished)return {aborted:true,completed:true};
+        const r=await run(located.node,[helper,located.entry,session],{env:located.env,timeout:30000});
+        if(r.code!==0)throw Error('OpenClaw could not confirm cancellation.');
+        const result=json(r.stdout);
+        if(result.aborted===true)return result;
+        if(!request)throw Error('OpenClaw did not confirm an active run was stopped.');
+        await wait(250);
+      }
+      throw Error('OpenClaw has not confirmed Stop. The request may still be running; try Stop again.');
+    })();
+    if(request){request.cancel=operation;operation.catch(()=>{request.cancel=null;});}
     return operation;
   }
   return {locate,install,configured,onboard,setName,agents,gatewayRunning,restartGateway,startGateway,chat,doctor,repair,configGet,configPatch,skills,skillInfo,installSearch,cancelChat,log:()=>[...lastLog]};

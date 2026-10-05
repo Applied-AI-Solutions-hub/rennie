@@ -5,7 +5,7 @@ const {createWindowsRuntime}=require('./local-runtime.cjs');
 const {createOpenClaw}=require('./openclaw-native.cjs');
 const llama=require('./llama-runtime.cjs');
 const preflight=require('./preflight.cjs');
-module.exports=function register(getWindow,onSelected,onReady=()=>{},chatBusy=()=>false) {
+module.exports=function register(getWindow,onSelected,onReady=()=>{},chatBusy=()=>false,getAgent=()=> 'main') {
   let manager,openclaw,engine=null,hardware=null;
   const development=!app.isPackaged&&process.argv.includes('--rennie-dev');
   // The llama.cpp engine and its models live outside the roaming profile: they are large and belong to this PC.
@@ -14,7 +14,7 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{},chatBusy=()
   const recommendation=()=>hardware||(hardware=llama.detect().then(found=>llama.choose(found)).catch(()=>null));
   const claw=()=>openclaw||(openclaw=development?require('./dev-openclaw.cjs').createDevOpenClaw({directory:path.join(app.getPath('userData'),'native-openclaw'),getTarget:()=>{if(!engine)throw Error('Set up the local engine first.');return engine.target(manager?.get().model||'qwen3.5-9b');}}):createOpenClaw({directory:path.join(app.getPath('userData'),'openclaw')}));
   let nativeSkills;
-  const skillManager=()=>{const native=claw();if(!native.configured())throw Error('Set up your OpenClaw assistant before enabling skills.');return nativeSkills||(nativeSkills=require('./native-skills.cjs').createNativeSkills({claw:native}));};
+  const skillManager=()=>{const native=claw();if(!native.configured())throw Error('Set up your OpenClaw assistant before enabling skills.');return nativeSkills||(nativeSkills=require('./native-skills.cjs').createNativeSkills({claw:native,getAgent}));};
   const idle=()=>{if(chatBusy()||manager?.get().busy)throw Error('Wait for the current reply or setup to finish before changing skills.');};
   ipcMain.handle('skills-status',()=>skillManager().status());
   ipcMain.handle('skills-prepare',(_,choice)=>{idle();if(typeof choice?.search!=='boolean')throw Error('Choose whether to enable web search.');return skillManager().prepare(choice);});
@@ -62,7 +62,7 @@ module.exports=function register(getWindow,onSelected,onReady=()=>{},chatBusy=()
       const selected=engine?await engine.plan(chosen):null;
       const needs=await current.needs(chosen,selected);
       return {...assess(needs),modelCached:!needs.needsModel,...(selected&&!selected.fits?{enoughSpace:false,problem:selected.problem}:{}),selectedBackend:selected?.build,backendReason:selected?.reason,recommended:engine?pick?.model||llama.MODELS.at(-1).id:preflight.recommendModel(os.totalmem(),MODELS),recommendedReason:pick?.reason||null,lowMemory:!!pick?.lowMemory};
-    }catch{return null;}
+    }catch(error){console.error('Local hardware check failed:',error.message);return null;}
   });
   ipcMain.handle('local-prepare',(_,choice)=>{
     const current=get();if(current.get().busy)return current.get();

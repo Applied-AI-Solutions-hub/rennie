@@ -8,13 +8,14 @@ function extendTools(current={},names=[]){
   const key=Array.isArray(current.allow)?'allow':'alsoAllow';
   return {[key]:[...new Set([...(current[key]||[]),...names])],fs:{workspaceOnly:true}};
 }
-function createNativeSkills({claw,source=path.join(__dirname,'skills')}){
+function createNativeSkills({claw,getAgent=()=> 'main',source=path.join(__dirname,'skills')}){
  let changing=false;
+ const agent=()=>{const id=getAgent();if(!/^[\w.-]{1,80}$/.test(id||''))throw Error('Connect an OpenClaw agent first.');return id;};
  async function status(){
-  const [report,search]=await Promise.all([claw.skills(),claw.configGet('tools.web.search')]);
+  const [report,search]=await Promise.all([claw.skills(agent()),claw.configGet('tools.web.search')]);
   return {workspace:report.workspaceDir,searchEnabled:search?.enabled===true,searchProvider:search?.provider||null,disclosure:SEARCH_DISCLOSURE,skills:(report.skills||[]).map(s=>({name:s.name,description:s.description,enabled:!s.disabled,eligible:!!s.eligible,visible:!!s.modelVisible,source:s.source,starter:STARTERS.includes(s.name),missing:s.missing}))};
  }
- async function workspace(){const report=await claw.skills();if(!path.isAbsolute(report.workspaceDir||''))throw Error('OpenClaw has not provided an absolute workspace path.');return report.workspaceDir;}
+ async function workspace(){const report=await claw.skills(agent());if(!path.isAbsolute(report.workspaceDir||''))throw Error('OpenClaw has not provided an absolute workspace path.');return report.workspaceDir;}
  async function change(fn){if(changing)throw Error('A skills change is already in progress.');changing=true;try{return await fn();}finally{changing=false;}}
  async function prepare({search=false}={}){return change(async()=>{
   const root=await workspace();fs.mkdirSync(root,{recursive:true});const canonical=fs.realpathSync(root);
@@ -23,11 +24,11 @@ function createNativeSkills({claw,source=path.join(__dirname,'skills')}){
    for(const dir of [path.join(root,'skills'),path.dirname(item.file)]){if(fs.existsSync(dir)&&!fs.realpathSync(dir).startsWith(canonical+path.sep))throw Error('The skills directory points outside the workspace.');}
    if(fs.existsSync(item.file)&&(fs.lstatSync(item.file).isSymbolicLink()||fs.readFileSync(item.file,'utf8')!==item.text))throw Error('An existing '+item.name+' skill differs. It has been preserved; review it before upgrading.');
   }
-  const current=await claw.configGet('agents.entries.main.tools')||{};
+  const current=await claw.configGet('agents.entries.'+agent()+'.tools')||{};
   const plugin=search?await claw.configGet('plugins.entries.parallel'):null;
   if(search&&!plugin)await claw.installSearch();
   const entries=Object.fromEntries(STARTERS.map(name=>[name,{enabled:true}]));
-  const patch={skills:{entries},agents:{entries:{main:{tools:extendTools(current,[...FILE_TOOLS,...(search?['web_search','web_fetch']:[])])}}}};
+  const patch={skills:{entries},agents:{entries:{[agent()]:{tools:extendTools(current,[...FILE_TOOLS,...(search?['web_search','web_fetch']:[])])}}}};
   if(search){
    patch.tools={web:{search:{enabled:true,provider:'parallel-free'},fetch:{enabled:true}}};
    const allowed=await claw.configGet('plugins.allow');
@@ -40,8 +41,8 @@ function createNativeSkills({claw,source=path.join(__dirname,'skills')}){
  });}
  async function toggle(name,enabled){return change(async()=>{
   if(typeof name!=='string'||!name||name.length>150||typeof enabled!=='boolean')throw Error('Invalid skill selection.');
-  const report=await claw.skills();if(!(report.skills||[]).some(s=>s.name===name))throw Error('This skill is not installed. Refresh the list.');
-  const info=await claw.skillInfo(name),key=info.skillKey;
+  const report=await claw.skills(agent());if(!(report.skills||[]).some(s=>s.name===name))throw Error('This skill is not installed. Refresh the list.');
+  const info=await claw.skillInfo(name,agent()),key=info.skillKey;
   if(typeof key!=='string'||!key||info.name!==name)throw Error('OpenClaw did not identify this skill configuration.');
   await claw.configPatch({skills:{entries:{[key]:{enabled}}}});return status();
  });}
