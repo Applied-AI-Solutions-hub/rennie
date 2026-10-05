@@ -56,6 +56,8 @@ jobs:
         run: ./test/unit/verify-signature.test.ps1
       - name: Build Windows installer
         run: pnpm dist:dev
+      - name: Check packaged native cancellation helper
+        run: pnpm exec electron test/smoke/packaged-helper-smoke.cjs
       - name: Check installer registration handling
         shell: pwsh
         run: |

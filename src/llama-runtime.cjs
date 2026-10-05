@@ -21,8 +21,9 @@ const BUILDS=Object.freeze({
  cpu:{label:'Processor only',unpackedBytes:50246496,archives:[
   {file:`llama-${RELEASE}-bin-win-cpu-x64.zip`,bytes:19441568,sha256:'d0b3016c9cc4bc1385de68be034adee570277ba952dd94292ba3888b7f18cc44'}]},
 });
-// Hugging Face files pinned to a repository revision, best first. The first
-// model this PC can run is chosen. AMD and Intel GPUs use the processor tier
+// Hugging Face files pinned to a repository revision. `build` preserves the
+// legacy backend on quiet reopen; explicit setup resolves hardware separately.
+// AMD and Intel GPUs use the processor tier
 // until they are tested (PrismML lists open Vulkan problems for Bonsai files). Each cutoff leaves room above the
 // measured 32K-context footprint (Bonsai 2: 9.1 GB; Qwen3.5 9B: 6,191 MiB, more than a 6 GB card's 6,144 MiB).
 const MODELS=Object.freeze([
@@ -31,7 +32,7 @@ const MODELS=Object.freeze([
  {id:'qwen3.5-9b',label:'Qwen3.5 9B',build:'cuda',minVideoMemory:7.5*GB,repo:'unsloth/Qwen3.5-9B-GGUF',revision:'3885219b6810b007914f3a7950a8d1b469d598a5',file:'Qwen3.5-9B-Q4_K_M.gguf',bytes:5680522464,sha256:'03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8',
   download:'About 5.7 GB',memory:'For NVIDIA GPUs with 8 GB or more of video memory.'},
  {id:'qwen3.5-4b',label:'Qwen3.5 4B',build:'cpu',minVideoMemory:0,repo:'unsloth/Qwen3.5-4B-GGUF',revision:'e87f176479d0855a907a41277aca2f8ee7a09523',file:'Qwen3.5-4B-Q4_K_M.gguf',bytes:2740937888,sha256:'00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4',
-  download:'About 2.7 GB',memory:'Runs on the processor, so it works on any PC. The first reply after starting can take a couple of minutes; later replies are quicker.'},
+  download:'About 2.7 GB',memory:'A smaller model for responsive local chat. Uses a compatible NVIDIA GPU when it fits; otherwise uses the processor with sufficient memory.'},
 ]);
 const TASK='Rennie model server';
 const modelUrl=model=>`https://huggingface.co/${model.repo}/resolve/${model.revision}/${model.file}`;
@@ -59,27 +60,53 @@ async function detect({executeImpl=execute,totalMemory=os.totalmem()}={}){
   return {gpu,totalMemory};
 }
 const driverAtLeast=(version,[major,minor])=>{const [a,b=0]=String(version||'').split('.').map(Number);return a>major||(a===major&&b>=minor);};
-function choose({gpu,totalMemory},models=MODELS){
+function executionPlan(model,{gpu,totalMemory}){
+  // 4B's CUDA cutoff is conservative pending measurements on 4–6 GB cards.
+  // Model weights alone do not include the 32K context and runtime overhead.
+  const videoRequired=model.id==='qwen3.5-4b'?5.5*GB:model.minVideoMemory;
+  const supported=model.id==='qwen3.5-4b'||model.build==='cuda';
   const cuda=!!gpu&&driverAtLeast(gpu.driver,CUDA_DRIVER);
-  const model=models.find(m=>m.build==='cpu'||(cuda&&gpu.videoMemory>=m.minVideoMemory));
-  return {model:model.id,build:model.build,lowMemory:Number.isFinite(totalMemory)&&totalMemory<SMALL_MEMORY,
-    reason:model.build==='cuda'?`${gpu.name} with ${Math.round(gpu.videoMemory/GB)} GB of video memory`:gpu&&!cuda&&gpu.driver?`${gpu.name} needs NVIDIA driver ${CUDA_DRIVER.join('.')} or newer; using the processor until the driver is updated`:'No supported GPU; using the processor'};
+  const build=supported&&cuda&&gpu.videoMemory>=videoRequired?'cuda':'cpu';
+  const ramRequired=model.id==='bonsai-2-27b'?16*GB:model.id==='qwen3.5-9b'?12*GB:SMALL_MEMORY;
+  const fits=build==='cuda'||model.id==='qwen3.5-4b'||Number.isFinite(totalMemory)&&totalMemory>=ramRequired;
+  const reason=build==='cuda'?`Using ${gpu.name} for ${model.label}`:
+    gpu&&!cuda?`Using the processor: ${gpu.name} needs NVIDIA driver ${CUDA_DRIVER.join('.')} or newer`:
+    supported&&cuda?`Using the processor: this model needs at least ${(videoRequired/GB).toFixed(1)} GB of video memory with the current context`:
+    'Using the processor: no compatible NVIDIA GPU was detected; AMD and Intel acceleration is not supported yet';
+  return {model:model.id,build,fits,reason,...(!fits?{problem:`${model.label} needs at least ${Math.ceil(ramRequired/GB)} GB of system memory on the processor. Choose a smaller model or use a compatible GPU.`}:{})};
+}
+function choose(hardware,models=MODELS){
+  // Catalog order is quality preference; CUDA cutoffs include context headroom.
+  const model=models.find(m=>executionPlan(m,hardware).build==='cuda')||models.find(m=>m.id==='qwen3.5-4b')||models.at(-1);
+  return {...executionPlan(model,hardware),lowMemory:Number.isFinite(hardware.totalMemory)&&hardware.totalMemory<SMALL_MEMORY};
 }
 function sha256(file){return new Promise((resolve,reject)=>{const hash=crypto.createHash('sha256');fs.createReadStream(file).on('error',reject).on('data',chunk=>hash.update(chunk)).on('end',()=>resolve(hash.digest('hex')));});}
 
-function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeImpl=execute,spawnImpl=spawn,platformName=process.platform,port=18080,stallMs=60000,wait,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),startTimeoutMs=300000,builds=BUILDS,models=MODELS,releaseUrl=RELEASE_URL,urlFor=modelUrl}){
-  const get=id=>{const model=models.find(m=>m.id===id);if(!model)throw Error('Choose one of the listed local models.');return model;};
+function createLlamaRuntime({directory,sharedModelDirectory=null,fetchImpl=fetch,env=process.env,executeImpl=execute,spawnImpl=spawn,platformName=process.platform,port=18080,taskName=TASK,scheduleEnabled=true,detectImpl=()=>detect({executeImpl}),stallMs=60000,wait,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),startTimeoutMs=300000,builds=BUILDS,models=MODELS,releaseUrl=RELEASE_URL,urlFor=modelUrl}){
+  const selections=new Map();
+  const get=id=>{const model=models.find(m=>m.id===id);if(!model)throw Error('Choose one of the listed local models.');return {...model,...selections.get(id)};};
+  let hardware;
+  const plan=async id=>{get(id);hardware ||= Promise.resolve().then(detectImpl).catch(error=>{hardware=null;throw error;});return executionPlan(models.find(m=>m.id===id),await hardware);};
+  async function configure(id,{build}={}){const selected=build?{model:id,build}:await plan(id);if(!build&&!selected.fits)throw Error(selected.problem);if(!builds[selected.build])throw Error('Unsupported local engine.');get(id);selections.set(id,selected);return selected;}
   const buildDir=build=>path.join(directory,'llama',RELEASE+'-'+build);
   const server=build=>path.join(buildDir(build),'llama-server.exe');
-  const modelFile=model=>path.join(directory,'models',model.file);
+  const localModelFile=model=>path.join(directory,'models',model.file);
   const keyFile=path.join(directory,'server-key.txt');
   const base=`http://127.0.0.1:${port}`;
   // Hashing a 7 GB model takes a while, so a verified model records its size
   // and time; a later check trusts that record while both still match.
-  const marker=model=>modelFile(model)+'.verified';
-  const verified=model=>{try{const s=fs.statSync(modelFile(model)),m=JSON.parse(fs.readFileSync(marker(model),'utf8'));return m.sha256===model.sha256&&m.size===s.size&&m.mtimeMs===s.mtimeMs;}catch{return false;}};
-  function needs(id){
-    const model=get(id),needsBuild=!fs.existsSync(server(model.build)),needsModel=!verified(model);
+  const fileVerified=(model,file)=>{try{const s=fs.statSync(file),m=JSON.parse(fs.readFileSync(file+'.verified','utf8'));return m.sha256===model.sha256&&m.size===s.size&&m.mtimeMs===s.mtimeMs;}catch{return false;}};
+  // Shared caches are read-only: only a verified complete file may be used.
+  // Downloads, partials and verification-marker writes always stay local.
+  const modelFile=model=>{
+    const local=localModelFile(model);
+    if(fileVerified(model,local)||!sharedModelDirectory)return local;
+    const shared=path.join(sharedModelDirectory,model.file);
+    return fileVerified(model,shared)?shared:local;
+  };
+  const verified=model=>fileVerified(model,modelFile(model));
+  function needs(id,selected){
+    const model={...get(id),...selected},needsBuild=!fs.existsSync(server(model.build)),needsModel=!verified(model);
     const buildBytes=builds[model.build].archives.reduce((sum,a)=>sum+a.bytes,0);
     return {needsBuild,needsModel,downloadBytes:(needsBuild?buildBytes:0)+(needsModel?model.bytes:0),modelBytes:model.bytes,buildBytes,unpackedBytes:builds[model.build].unpackedBytes||0};
   }
@@ -112,9 +139,10 @@ function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeIm
       for(const archive of builds[model.build].archives)fs.rmSync(path.join(downloads,archive.file),{force:true});
     }
     if(!verified(model)){
-      fs.mkdirSync(path.dirname(modelFile(model)),{recursive:true});
-      await fetchVerified({url:urlFor(model),target:modelFile(model),bytes:model.bytes,sha256:model.sha256,what:model.label+' model',phase:'downloading-model'},progress);
-      const s=fs.statSync(modelFile(model));fs.writeFileSync(marker(model),JSON.stringify({sha256:model.sha256,size:s.size,mtimeMs:s.mtimeMs}));
+      const target=localModelFile(model);
+      fs.mkdirSync(path.dirname(target),{recursive:true});
+      await fetchVerified({url:urlFor(model),target,bytes:model.bytes,sha256:model.sha256,what:model.label+' model',phase:'downloading-model'},progress);
+      const s=fs.statSync(target);fs.writeFileSync(target+'.verified',JSON.stringify({sha256:model.sha256,size:s.size,mtimeMs:s.mtimeMs}));
     }
   }
   // A 256-bit key, created once per install. The server reads it from this file, so it never appears in a process list.
@@ -147,6 +175,7 @@ function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeIm
   // A per-user task starts the server when this user signs in to Windows. conhost --headless runs it with no window.
   // No automatic restart: a server Rennie stops on purpose must stay stopped, and Rennie starts it again when opened.
   async function schedule(id){
+    if(!scheduleEnabled)return false;
     const model=get(id);
     const script="$ErrorActionPreference='Stop';$u=[Security.Principal.WindowsIdentity]::GetCurrent().Name;"+
       "$a=New-ScheduledTaskAction -Execute $env:RENNIE_EXE -Argument $env:RENNIE_ARGS -WorkingDirectory $env:RENNIE_DIR;"+
@@ -154,29 +183,34 @@ function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeIm
       "$s=New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew;"+
       "$p=New-ScheduledTaskPrincipal -UserId $u -LogonType Interactive -RunLevel Limited;"+
       "Register-ScheduledTask -TaskName $env:RENNIE_TASK -Description 'Starts the Rennie local model server (llama.cpp) on this PC only.' -Action $a -Trigger $t -Settings $s -Principal $p -Force | Out-Null";
-    try{await powershell(script,{RENNIE_TASK:TASK,RENNIE_EXE:path.join(env.SystemRoot||'C:\\Windows','System32','conhost.exe'),RENNIE_ARGS:['--headless',server(model.build),...args(id)].map(quote).join(' '),RENNIE_DIR:buildDir(model.build)});}
+    try{await powershell(script,{RENNIE_TASK:taskName,RENNIE_EXE:path.join(env.SystemRoot||'C:\\Windows','System32','conhost.exe'),RENNIE_ARGS:['--headless',server(model.build),...args(id)].map(quote).join(' '),RENNIE_DIR:buildDir(model.build)});}
     catch{throw Error('Rennie could not set the local model to start when you sign in. It still starts whenever Rennie opens.');}
   }
-  const scheduled=async()=>{try{await executeImpl('schtasks.exe',['/Query','/TN',TASK],{windowsHide:true,timeout:15000});return true;}catch{return false;}};
-  async function unschedule(){if(!await scheduled())return false;await powershell('Unregister-ScheduledTask -TaskName $env:RENNIE_TASK -Confirm:$false',{RENNIE_TASK:TASK});return true;}
+  const scheduled=async()=>{try{await executeImpl('schtasks.exe',['/Query','/TN',taskName],{windowsHide:true,timeout:15000});return true;}catch{return false;}};
+  async function unschedule(){if(!await scheduled())return false;await powershell('Unregister-ScheduledTask -TaskName $env:RENNIE_TASK -Confirm:$false',{RENNIE_TASK:taskName});return true;}
   // Every llama-server.exe running from this runtime's own folder; never any other copy on the PC.
   async function ours(stop=false){
     const script="$d=[IO.Path]::GetFullPath($env:RENNIE_LLAMA_DIR).TrimEnd('\\')+'\\';$p=@(Get-CimInstance Win32_Process -Filter \"Name='llama-server.exe'\"|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($d,[StringComparison]::OrdinalIgnoreCase)});"+
       (stop?"foreach($x in $p){Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue};foreach($x in $p){Wait-Process -Id $x.ProcessId -Timeout 15 -ErrorAction SilentlyContinue};":'')+"$p.Count";
     try{const {stdout}=await powershell(script,{RENNIE_LLAMA_DIR:path.join(directory,'llama')},40000);return Number(String(stdout).trim())||0;}catch{return 0;}
   }
-  async function start(id){
+  async function start(id,{allowBackendSwitch=true}={}){
     const model=get(id),current=await status(id);
-    if(current==='ours')return {started:false};
+    if(current==='ours'&&!selections.has(id))return {started:false};
+    if(current==='ours'){
+      const {stdout}=await powershell("@(Get-CimInstance Win32_Process -Filter \"Name='llama-server.exe'\"|Where-Object{$_.ExecutablePath -eq $env:RENNIE_EXPECTED_EXE}).Count",{RENNIE_EXPECTED_EXE:server(model.build)});
+      if(Number(String(stdout).trim())===1)return {started:false};
+      if(!allowBackendSwitch)throw Error('This model is running on a different engine. Choose Resume setup to switch; the running model was kept.');
+    }
     if(current==='foreign')throw Error(`Another program is using port ${port} on this PC, so the local model server cannot start. Close that program, then retry.`);
-    if(current==='other-model'||current==='loading')await stop();
     if(!fs.existsSync(server(model.build))||!verified(model))throw Error('The local model is not set up yet. Choose Set up my assistant.');
+    if(current==='ours'||current==='other-model'||current==='loading')await stop();
     key();
     let failed=null,viaTask=false;
     if(await scheduled()){
       // The task always runs the chosen model, so it is refreshed before it runs.
       await schedule(id);
-      try{await executeImpl('schtasks.exe',['/Run','/TN',TASK],{windowsHide:true,timeout:15000});viaTask=true;}catch{}
+      try{await executeImpl('schtasks.exe',['/Run','/TN',taskName],{windowsHide:true,timeout:15000});viaTask=true;}catch{}
     }
     if(!viaTask){
       const child=spawnImpl(server(model.build),args(id),{cwd:buildDir(model.build),detached:true,windowsHide:true,stdio:'ignore'});
@@ -195,7 +229,7 @@ function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeIm
   }
   // Stops only llama-server copies running from this runtime's folder, and waits until they have exited so the port is free.
   async function stop(){
-    if(await scheduled())await executeImpl('schtasks.exe',['/End','/TN',TASK],{windowsHide:true,timeout:15000}).catch(()=>null);
+    if(await scheduled())await executeImpl('schtasks.exe',['/End','/TN',taskName],{windowsHide:true,timeout:15000}).catch(()=>null);
     const stopped=await ours(true)>0;
     // Wait-Process can return while Windows is still ending the process; the next server needs the port.
     for(let attempt=0;stopped&&attempt<20&&await ours()>0;attempt++)await sleep(500);
@@ -229,6 +263,6 @@ function createLlamaRuntime({directory,fetchImpl=fetch,env=process.env,executeIm
   // What setup needs to hand OpenClaw's llama.cpp connector.
   const target=id=>({baseUrl:base+'/v1',modelId:get(id).id,apiKey:key(),thinking:get(id).reasoning||null});
   const running=async id=>await status(id)==='ours';
-  return {kind:'llama',models,needs,install,start,status,running,stop,key,args,schedule,scheduled,unschedule,verify,complete,target,paths:{directory,keyFile,server,modelFile:id=>modelFile(get(id))},baseUrl:base+'/v1'};
+  return {kind:'llama',models,plan,configure,needs,install,start,status,running,stop,key,args,schedule,scheduled,unschedule,verify,complete,target,paths:{directory,keyFile,server,modelFile:id=>modelFile(get(id))},baseUrl:base+'/v1'};
 }
-module.exports={createLlamaRuntime,detect,choose,BUILDS,MODELS,RELEASE,TASK,modelUrl,GB};
+module.exports={createLlamaRuntime,detect,choose,executionPlan,BUILDS,MODELS,RELEASE,TASK,modelUrl,GB};

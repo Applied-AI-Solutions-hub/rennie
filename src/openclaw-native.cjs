@@ -61,6 +61,7 @@ function expand(value,env){return value.replace(/%([^%]+)%/g,(whole,name)=>{cons
 
 function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetch,exists=fs.existsSync,readText=file=>fs.readFileSync(file,'utf8'),home=os.homedir(),platformName=process.platform,wait=sleep,now=Date.now,installSha256=INSTALL_SHA256}={}){
   let located=null,lastLog=[];
+  const activeChats=new Map();
   // `gateway status` starts a node process and the app asks every 30 s, so a
   // recent answer is reused. Setup, repair and failed chats force a fresh one.
   const GATEWAY_TTL=120000;let gateway={at:-Infinity,up:false,pending:null};
@@ -179,7 +180,7 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
   // Onboarding starts the gateway while it is still saving the connector and its key; a gateway that loaded
   // its settings too early answers with HTTP 401. OpenClaw's plugin guide also asks for a restart after adding a
   // plugin. So after Rennie sets OpenClaw up, the gateway is restarted once. Best effort: startGateway() follows.
-  async function restartGateway(){await cli(['gateway','restart'],{timeout:180000}).catch(()=>null);forgetGateway();}
+  async function restartGateway({required=false}={}){const r=await cli(['gateway','restart'],{timeout:180000}).catch(()=>null);forgetGateway();if(required&&r?.code!==0)throw Error('OpenClaw could not confirm the restart. Run its diagnostics before trying again.');}
   async function startGateway(){
     if(await gatewayRunning({fresh:true}))return;
     let r=await cli(['gateway','start'],{timeout:120000});
@@ -191,7 +192,7 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
   // A cold CPU model can spend more than five minutes reading OpenClaw's
   // initial prompt. Apply the same bounded budget to setup and later chats:
   // the first request after a Windows restart is cold too.
-  async function chat({message,session,timeoutSeconds=900}){
+  async function chat({message,session,timeoutSeconds=1800,expectedFiles}){
     if(typeof message!=='string'||!message.trim())throw Error('Enter a message.');
     if(!SESSION.test(String(session)))throw Error('This conversation has an invalid session. Start a new chat.');
     if(!Number.isFinite(timeoutSeconds)||timeoutSeconds<1)throw Error('Reply timeout must be at least one second.');
@@ -200,11 +201,17 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     fs.mkdirSync(path.join(directory,'messages'),{recursive:true});
     const file=path.join(directory,'messages',crypto.randomUUID()+'.txt');
     fs.writeFileSync(file,message,{encoding:'utf8',mode:0o600});
+    const request={cancel:null,stopping:false,finished:false};activeChats.set(session,request);
+    let verify=null;
+    const evidence=require('./action-evidence.cjs');
+    const expected=expectedFiles??evidence.requestedFiles(message);
     const ask=async()=>{
       // A retry spends the remaining budget; it must not start a second full wait.
+      if(request.stopping)throw Error('Reply stopped.');
       const remaining=deadline-now(),seconds=Math.floor(remaining/1000);
       if(seconds<1)throw timeoutError();
       const r=await cli(['agent','--session-key',session,'--message-file',file,'--json','--timeout',String(seconds)],{timeout:remaining+60000});
+      if(request.stopping)throw Error('Reply stopped.');
       if(r.timedOut)throw timeoutError();
       let result;try{result=json(r.stdout);}catch{throw Error(r.timedOut?'Your assistant did not reply in time.':'OpenClaw did not return a reply. Check that its gateway is running in This PC.');}
       const reply=readAgentReply(result);
@@ -215,9 +222,36 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
       // Sandbox runs (2026-09-30): about half the time OpenClaw's first request after it starts reached the
       // llama.cpp server without the key it had saved (HTTP 401), while a later request worked. OpenClaw's own
       // message says to try again in a moment, so a 401 is retried once after a short wait.
-      try{return await ask();}
-      catch(error){if(!/HTTP 401/.test(error.message))throw error;if(deadline-now()<=15000)throw timeoutError();keep(lastLog,'OpenClaw returned HTTP 401; trying the reply again once within the original reply deadline.',80);await wait(15000);return await ask();}
-    }catch(error){forgetGateway();throw error;}finally{fs.rmSync(file,{force:true});}
+      let expectedRoot=null,verificationUnavailable=false;
+      if(expected.length){
+        try{
+          const root=(await skills(session.split(':')[1])).workspaceDir;
+          if(typeof root!=='string'||!root.trim())throw Error('Workspace unavailable.');
+          expectedRoot=fs.realpathSync(root);
+          if(!fs.statSync(expectedRoot).isDirectory())throw Error('Workspace unavailable.');
+        }catch{
+          // Explicit callers require a contract, even when discovery fails.
+          if(expectedFiles)throw Error('The requested file action could not be verified because the workspace is unavailable.');
+          verificationUnavailable=true;
+        }
+        // Path/contract errors must not silently bypass verification.
+        if(expectedRoot&&!verificationUnavailable)verify=evidence.capture(expectedRoot,expected);
+      }
+      const checked=async()=>{
+        let reply=await ask();
+        if(!verify)return verificationUnavailable?{...reply,content:'Rennie could not check the requested files because the workspace is unavailable. Any file-action claims below are unverified.\n\n'+reply.content,evidence:{kind:'workspace-files',status:'unavailable',files:[]}}:reply;
+        let files=verify();
+        if(files.some(item=>!item.ok)){
+          if(request.stopping)throw Error('Reply stopped.');
+          fs.writeFileSync(file,'Rennie checked the requested output files on disk. These files were not created or updated with the required content: '+files.filter(item=>!item.ok).map(item=>item.file).join(', ')+'. Finish the original request using your native tools, then read the outputs back. If you cannot finish, explain the failure. Do not claim that an unverified action succeeded. Original request: '+message,{encoding:'utf8'});
+          reply=await ask();files=verify();
+        }
+        if(files.some(item=>!item.ok))throw Error('The requested file action could not be verified: '+files.filter(item=>!item.ok).map(item=>item.file).join(', ')+'. Check the workspace before retrying; some files may have changed.');
+        return {...reply,evidence:{kind:'workspace-files',files}};
+      };
+      try{return await checked();}
+      catch(error){if(!/HTTP 401/.test(error.message))throw error;if(deadline-now()<=15000)throw timeoutError();keep(lastLog,'OpenClaw returned HTTP 401; trying the reply again once within the original reply deadline.',80);await wait(15000);return await checked();}
+    }catch(error){forgetGateway();throw error;}finally{request.finished=true;if(activeChats.get(session)===request)activeChats.delete(session);fs.rmSync(file,{force:true});}
   }
   async function doctor(){
     const r=await cli(['doctor','--json'],{timeout:180000});
@@ -228,6 +262,57 @@ function createOpenClaw({directory,env=process.env,run=runProcess,fetchImpl=fetc
     const r=await cli(['doctor','--fix','--non-interactive'],{timeout:10*60*1000});forgetGateway();
     return {ok:r.code===0,report:await doctor().catch(()=>null)};
   }
-  return {locate,install,configured,onboard,setName,agents,gatewayRunning,restartGateway,startGateway,chat,doctor,repair,log:()=>[...lastLog]};
+  async function configGet(key){
+    const r=await cli(['config','get',key,'--json']);
+    if(r.code!==0){if(/unset|not found|default applies/i.test(r.stdout+' '+r.stderr))return undefined;throw Error('OpenClaw could not read '+key+'.');}
+    try{return JSON.parse(r.stdout.trim());}catch{throw Error('OpenClaw returned unreadable settings.');}
+  }
+  async function configPatch(patch){
+    fs.mkdirSync(directory,{recursive:true});const file=path.join(directory,'patch-'+crypto.randomUUID()+'.json');
+    fs.writeFileSync(file,JSON.stringify(patch),{mode:0o600});
+    try{const r=await cli(['config','patch','--file',file],{timeout:120000});if(r.code!==0)throw Error('OpenClaw did not accept these settings. Existing settings were not replaced by Rennie.');}
+    finally{fs.rmSync(file,{force:true});}
+  }
+  async function skills(agent=AGENT){
+    if(!/^[\w.-]{1,80}$/.test(agent))throw Error('Invalid agent.');
+    const r=await cli(['skills','list','--agent',agent,'--json']);
+    if(r.code!==0)throw Error('OpenClaw could not list skills.');return json(r.stdout);
+  }
+  async function skillInfo(name,agent=AGENT){
+    if(!/^[\w.-]{1,80}$/.test(agent))throw Error('Invalid agent.');
+    if(typeof name!=='string'||!name||name.length>150||name.startsWith('-'))throw Error('Invalid skill name.');
+    const r=await cli(['skills','info',name,'--agent',agent,'--json']);
+    if(r.code!==0)throw Error('OpenClaw could not inspect this skill.');return json(r.stdout);
+  }
+  async function installSearch(){
+    const r=await cli(['plugins','install','@openclaw/parallel-plugin@'+VERSION],{timeout:600000});
+    if(r.code!==0)throw Error('The free search plugin could not be installed. No paid service was selected.');
+  }
+  async function cancelChat(session){
+    if(!SESSION.test(String(session)))throw Error('Invalid conversation.');
+    if(!located&&!await locate())throw Error('OpenClaw is not installed.');
+    const request=activeChats.get(session);
+    if(request?.cancel)return request.cancel;
+    if(request)request.stopping=true;
+    // External Node cannot read app.asar. Electron reads the bundled helper,
+    // then materializes an exact, content-addressed copy outside the archive.
+    const helper=require('./external-helper.cjs').materialize(directory,'openclaw-cancel.mjs');
+    const operation=(async()=>{
+      const stopDeadline=now()+30000;
+      for(let attempt=0;attempt<20&&now()<stopDeadline;attempt++){
+        if(request?.finished)return {aborted:true,completed:true};
+        const r=await run(located.node,[helper,located.entry,session],{env:located.env,timeout:Math.max(1,stopDeadline-now())});
+        if(r.code!==0)throw Error('OpenClaw could not confirm cancellation.');
+        const result=json(r.stdout);
+        if(result.aborted===true)return result;
+        if(!request)throw Error('OpenClaw did not confirm an active run was stopped.');
+        await wait(250);
+      }
+      throw Error('OpenClaw has not confirmed Stop. The request may still be running; try Stop again.');
+    })();
+    if(request){request.cancel=operation;operation.catch(()=>{request.cancel=null;});}
+    return operation;
+  }
+  return {locate,install,configured,onboard,setName,agents,gatewayRunning,restartGateway,startGateway,chat,doctor,repair,configGet,configPatch,skills,skillInfo,installSearch,cancelChat,log:()=>[...lastLog]};
 }
 module.exports={createOpenClaw,runProcess,parseAgents,VERSION,INSTALL_SCRIPT};

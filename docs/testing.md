@@ -30,6 +30,12 @@ The report is attached to the run as an artifact and printed in the job log. Eac
 
 ## Development PC
 
+For R7 development, `pnpm dev` uses a separate engine inside `.qa/dev-profile`, port 18082, and no sign-in task registration. OpenClaw runs as an isolated native gateway with its own configuration, state and workspace; chat and starter skills use that agent. The installed engine, key, task and OpenClaw profile stay separate. Development setup automatically reuses complete models from the installed cache when their verification marker matches the catalog, size and modification time. That cache is read-only: downloads, partials and new markers stay in the development directory. `pnpm dev:fresh` creates another isolated profile; it can reuse those verified models but needs its own engine. Never copy credentials.
+
+The selected model's backend is resolved during explicit setup. Quiet reopen retains the saved backend; pre-R7 setups retain their legacy backend until the user resumes setup. Check CPU-to-CUDA and CUDA-to-CPU switches of the same model, cache/key reuse, missing replacement engines, and sign-in task path/arguments. CPU-only coverage remains in the sandbox. NVIDIA coverage must include 4B on CUDA. AMD/Intel acceleration and small NVIDIA cards remain unverified; the 4B CUDA threshold of 5.5 GiB is conservative, not a measured minimum. GPU memory contention can still prevent loading.
+
+Local R7 evidence: on a 16 GB NVIDIA card, isolated 4B CUDA startup and both deterministic reply checks passed with zero downloads. NVIDIA's process list included the isolated llama-server and GPU memory rose by approximately 3.9 GiB. These short direct prompts do not measure OpenClaw's cold first reply.
+
 The development PC has an NVIDIA GPU (RTX 5060 Ti, 16 GB) and Smart App Control **on**. Rennie runs there every day, so the test upgrades the real installed copy.
 
 **Rules:**
@@ -72,6 +78,30 @@ Use a separate Git checkout per machine or agent, fetch before starting, and sub
 
 - **Signing:** the SignPath Foundation application (#3). Until then, protected consumer PCs may block the installer.
 - **Processor path on real hardware:** only the sandbox VM covers it now.
-- **First reply on the processor:** sandbox run 36806197972 passed setup and upgrade but exceeded the 17-minute test deadline after a simulated restart. Its subsequent repair failure happened while the earlier request could still be running, so it needs an independent rerun. Authentication retries now share the original 15-minute reply budget, and the sandbox stops if its own deadline expires rather than starting repair against an unresolved request. These changes bound the wait; they do not establish a latency improvement. A warm-up at sign-in is planned.
+- **First reply on the processor:** sandbox run 36806197972 passed setup and upgrade but exceeded the 17-minute test deadline after a simulated restart. Its subsequent repair failure happened while the earlier request could still be running, so it needs an independent rerun. Authentication retries now share a 30-minute reply budget; sandbox chat waits allow 32 minutes and repeat setup waits allow 35 minutes, and the sandbox stops if its own deadline expires rather than starting repair against an unresolved request. These changes bound the wait; they do not establish a latency improvement. A warm-up at sign-in is planned.
 - **OpenClaw background jobs:** OpenClaw runs its own heartbeat every 30 minutes, which can wake the model.
 - **Ollama:** kept only for installs already set up on it; removal is planned.
+
+## Native skills upgrade (local, not yet released)
+
+The starter workflow uses normal OpenClaw gateway sessions, with research and document SKILL.md files in the agent workspace. Search is opt-in: Parallel receives queries; its free provider requires no account/key. Existing native skills and tool policies are preserved. The Skills page lists native eligibility and supports enable/disable, text-file copies into the workspace, and an explicit idle gateway restart. Starter file conflicts are preserved rather than overwritten.
+
+Local verification: unit and mocked Electron UI checks; the installed OpenClaw 2026.9.3 accepts the configuration and discovers both skills. An isolated gateway with a simulated model searched the web, fetched a NASA page, read a skill, wrote/read a document, retained session history, and accepted cancellation through the public SDK using the same local operator scope as the agent CLI. This is integration evidence, not a model-quality or latency benchmark. No installed-app upgrade has been performed for this work.
+
+Run `test/scenarios/native-skills.json` on Qwen3.5 4B CPU, Qwen3.5 4B CUDA, and Bonsai 2 27B CUDA. Record cold/warm latency, actual prompt tokens, tool results and pass/fail evidence for each case. All real-model matrix results remain UNTESTED until recorded. Approval UI for consequential external actions and additional bookkeeping/marketing workflows are later work; this upgrade does not auto-approve native actions. The separate Dev tool prototype remains local-only.
+
+Additional Dev verification: Qwen3.5 9B on CUDA passed native setup, read the documents skill, wrote a requested text file and read it back. Both starter skills were visible and the opt-in search plugin installed in the isolated Dev profile. This is one actual-model file-tools check, not the full matrix or an actual-model search benchmark. The clean delivery branch passes 139 unit tests, the PowerShell setup suite and the Electron workspace smoke test.
+
+Development now uses a native OpenClaw gateway with its own configuration, state, workspace and port, without registering a Windows service. `--dev-profile <path>` preserves an existing development profile across checkouts. Existing model files can be reused; the installed app profile is unchanged.
+
+### File action evidence and PR #25 fixes
+
+Named text-output requests are checked against the connected agent's workspace before Rennie displays a successful reply. A missing or unchanged output gets one native follow-up within the original timeout; a second failure becomes an error. File receipts establish creation/change and bytes read from disk, not factual accuracy or proof of which process wrote the file. Ambiguous, conditional and negated requests are not inferred as file contracts. Explicit programmatic contracts can also check exact text or required content. OpenClaw retains its native tools and policies.
+
+Review follow-ups: if workspace discovery fails for an inferred request, the reply carries a prominent notice that its file-action claims are unverified; no disk receipt is issued. Explicit file contracts still fail closed, and unsafe paths never take this fallback. Curly-quote detection uses Unicode escapes so source encoding cannot corrupt it. All 150 unit tests pass after these changes.
+
+Local validation: 148 unit tests, Host setup/progress/cleanup checks, workspace and repaired setup smoke checks passed. An unsigned development installer built successfully; the packaged cancellation helper was extracted from its actual app.asar and executed by external Node against a fake public SDK endpoint. This proves packaging/transport, not an installed real-model Stop test. No installed application or security settings were changed.
+
+Follow-up model checks on 2026-10-05 do **not** qualify a default-model change. Three focused file tasks per backend completed as follows: Bonsai 4B CPU 3/3 and CUDA 2/3; Qwen3.5 4B CPU 2/3 and CUDA 3/3. Failed file outputs were withheld, and one Qwen CPU run timed out. A single GPU diagnostic pass of the twelve native scenarios plus three fresh cases found research and document-workflow failures in both models. Actual in-flight inference was observed and ended after Stop on both GPU models.
+
+The full repeated qualification matrix remains incomplete: the remaining full CPU suite was stopped after the GPU correctness gate failed. Early GPU research fixtures excluded web tools and were replaced by corrected runs; long CPU profile paths also caused memory-index temporary-path errors, so those timings are diagnostic. File evidence does not certify factual accuracy, prove the model read its source, or validate unrelated action claims. The current Dev model has not changed.
